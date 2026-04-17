@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
+import { fmtNum, fmtDays } from '../utils'
 import StatusBadge from '../components/StatusBadge'
 import ForecastChart from '../components/ForecastChart'
 import Spinner from '../components/Spinner'
 import { getProduct } from '../api'
 
-const fmt = v => v == null ? '—' : Number(v).toLocaleString()
+// fmt → fmtNum desde utils
 
 function InfoCard({ label, value, sub, highlight }) {
   return (
@@ -59,7 +60,7 @@ export default function ProductDetail({ productId, onBack }) {
             </div>
             <div className="text-right shrink-0">
               <p className="text-xs text-slate-500 mb-0.5">{rec.urgency === 'ORDEN_ABIERTA' ? 'Cantidad ordenada' : 'Cantidad sugerida'}</p>
-              <p className={`text-xl font-bold font-mono ${rec.urgency === 'ORDEN_ABIERTA' ? 'text-blue-400' : 'text-orange-400'}`}>{fmt(rec.qty_suggested)}</p>
+              <p className={`text-xl font-bold font-mono ${rec.urgency === 'ORDEN_ABIERTA' ? 'text-blue-400' : 'text-orange-400'}`}>{fmtNum(rec.qty_suggested)}</p>
             </div>
           </div>
         </div>
@@ -67,8 +68,8 @@ export default function ProductDetail({ productId, onBack }) {
 
       {/* Info cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <InfoCard label="Stock GDL" value={fmt(p.current_stock)} highlight={p.current_stock < 0} sub="solo CEDIS principal" />
-        <InfoCard label="Stock Total" value={fmt(p.stock_consolidado)} highlight={p.stock_consolidado < 0} sub="todos los almacenes" />
+        <InfoCard label="Stock GDL" value={fmtNum(p.current_stock)} highlight={p.current_stock < 0} sub="solo CEDIS principal" />
+        <InfoCard label="Stock Total" value={fmtNum(p.stock_consolidado)} highlight={p.stock_consolidado < 0} sub="todos los almacenes" />
         <InfoCard label="Lead Time" value={`${p.lead_time_days?.toFixed(0)}d`} sub="último registrado" />
         <InfoCard label="Cobertura" value={p.days_coverage > 999 ? '∞' : `${p.days_coverage?.toFixed(1)}d`}
           highlight={p.days_coverage < p.lead_time_days} sub="días restantes" />
@@ -87,17 +88,17 @@ export default function ProductDetail({ productId, onBack }) {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="card">
           <p className="text-xs text-slate-500 uppercase tracking-widest mb-3">Venta Diaria Prom.</p>
-          <p className="text-2xl font-bold font-mono text-white">{fmt(p.avg_daily_sales)}</p>
+          <p className="text-2xl font-bold font-mono text-white">{fmtNum(p.avg_daily_sales)}</p>
           <p className="text-xs text-slate-500 mt-1">{p.unidad || 'unidades'} / día · solo GDL</p>
         </div>
         <div className="card">
           <p className="text-xs text-slate-500 uppercase tracking-widest mb-3">Safety Stock</p>
-          <p className="text-2xl font-bold font-mono text-white">{fmt(p.safety_stock)}</p>
+          <p className="text-2xl font-bold font-mono text-white">{fmtNum(p.safety_stock)}</p>
           <p className="text-xs text-slate-500 mt-1">buffer de seguridad (1.5σ)</p>
         </div>
         <div className="card">
           <p className="text-xs text-slate-500 uppercase tracking-widest mb-3">Punto de Reorden</p>
-          <p className="text-2xl font-bold font-mono text-accent">{fmt(p.reorder_point)}</p>
+          <p className="text-2xl font-bold font-mono text-accent">{fmtNum(p.reorder_point)}</p>
           <p className="text-xs text-slate-500 mt-1">demanda × lead time + safety</p>
         </div>
       </div>

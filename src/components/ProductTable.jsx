@@ -1,3 +1,4 @@
+import { fmtNum } from '../utils'
 import StatusBadge from './StatusBadge'
 
 export default function ProductTable({ products, onSelect, page, totalPages, onPage }) {
@@ -28,10 +29,10 @@ export default function ProductTable({ products, onSelect, page, totalPages, onP
                   {p.categoria && <p className="text-xs text-slate-500">{p.categoria}</p>}
                 </td>
                 <td className={`py-3 text-right font-mono text-xs ${p.current_stock < 0 ? 'text-red-400' : 'text-slate-400'}`}>
-                  {p.current_stock?.toLocaleString()}
+                  {fmtNum(p.current_stock)}
                 </td>
                 <td className={`py-3 text-right font-mono text-xs hidden sm:table-cell ${p.stock_consolidado < 0 ? 'text-red-400' : 'text-slate-300'}`}>
-                  {p.stock_consolidado?.toLocaleString()}
+                  {fmtNum(p.stock_consolidado)}
                 </td>
                 <td className="py-3 text-right font-mono text-xs text-slate-500 hidden md:table-cell">{p.lead_time_days?.toFixed(0)}d</td>
                 <td className="py-3 text-right">
