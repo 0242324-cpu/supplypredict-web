@@ -12,11 +12,13 @@ export default function AlertList({ alerts, onSelect }) {
           <button key={a.product_id} onClick={() => onSelect(a.product_id)}
             className="w-full flex items-center justify-between px-4 py-3 rounded-lg bg-slate-900/60 hover:bg-slate-800/80 transition-colors group text-left">
             <div>
-              <p className="font-mono text-sm text-white group-hover:text-accent transition-colors">{a.product_id}</p>
+              <p className="font-mono text-xs text-slate-400">{a.product_id}</p>
+              <p className="text-sm text-white group-hover:text-accent transition-colors font-medium">{a.nombre || a.product_id}</p>
               <p className="text-xs text-slate-500 mt-0.5">
-                Stock: <span className={a.current_stock < 0 ? 'text-red-400' : 'text-slate-300'}>{a.current_stock?.toLocaleString()}</span>
+                {a.categoria && <span className="mr-2 text-slate-400">{a.categoria}</span>}
+                Stock: <span className={a.stock_consolidado < 0 ? 'text-red-400' : 'text-slate-300'}>{a.stock_consolidado?.toLocaleString()}</span>
                 &nbsp;·&nbsp;Lead: {a.lead_time_days?.toFixed(0)}d
-                &nbsp;·&nbsp;Comprar: <span className="text-orange-400">{a.qty_recommended?.toLocaleString()}</span>
+                {a.qty_recommended > 0 && <>&nbsp;·&nbsp;Comprar: <span className="text-orange-400">{a.qty_recommended?.toLocaleString()}</span></>}
               </p>
             </div>
             <StatusBadge status={a.status} />

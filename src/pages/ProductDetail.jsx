@@ -17,7 +17,7 @@ function InfoCard({ label, value, sub, highlight }) {
 }
 
 export default function ProductDetail({ productId, onBack }) {
-  const [data, setData] = useState(null)
+  const [data, setData]     = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -32,28 +32,34 @@ export default function ProductDetail({ productId, onBack }) {
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
-      {/* Back + title */}
+      {/* Header */}
       <div className="flex items-center gap-4">
-        <button onClick={onBack}
-          className="text-xs text-slate-400 hover:text-white transition-colors flex items-center gap-1.5">
-          ← Volver
-        </button>
+        <button onClick={onBack} className="text-xs text-slate-400 hover:text-white transition-colors">← Volver</button>
         <div className="h-4 w-px bg-slate-700" />
-        <h1 className="font-mono text-sm text-slate-300">{p.product_id}</h1>
+        <div>
+          <p className="font-mono text-xs text-slate-500">{p.product_id}</p>
+          {p.nombre && p.nombre !== p.product_id && <p className="text-white font-medium">{p.nombre}</p>}
+        </div>
+        {p.categoria && <span className="text-xs text-slate-400 border border-slate-700 rounded-full px-2.5 py-0.5">{p.categoria}</span>}
         <StatusBadge status={p.status} />
       </div>
 
-      {/* Recommendation banner */}
+      {/* Recommendation / Orden abierta */}
       {rec && (
-        <div className="card border border-red-500/20 bg-red-500/5">
+        <div className={`card border ${rec.urgency === 'ORDEN_ABIERTA'
+          ? 'border-blue-500/20 bg-blue-500/5'
+          : 'border-red-500/20 bg-red-500/5'}`}>
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-red-400 font-semibold text-sm mb-1">⚡ {rec.action}</p>
+              <p className={`font-semibold text-sm mb-1 ${rec.urgency === 'ORDEN_ABIERTA' ? 'text-blue-400' : 'text-red-400'}`}>
+                {rec.urgency === 'ORDEN_ABIERTA' ? '📦' : '⚡'} {rec.action}
+              </p>
               <p className="text-slate-400 text-xs">{rec.reason}</p>
+              {p.orden_proveedor && <p className="text-slate-500 text-xs mt-1">Proveedor: {p.orden_proveedor}</p>}
             </div>
             <div className="text-right shrink-0">
-              <p className="text-xs text-slate-500 mb-0.5">Cantidad sugerida</p>
-              <p className="text-xl font-bold font-mono text-orange-400">{fmt(rec.qty_suggested)}</p>
+              <p className="text-xs text-slate-500 mb-0.5">{rec.urgency === 'ORDEN_ABIERTA' ? 'Cantidad ordenada' : 'Cantidad sugerida'}</p>
+              <p className={`text-xl font-bold font-mono ${rec.urgency === 'ORDEN_ABIERTA' ? 'text-blue-400' : 'text-orange-400'}`}>{fmt(rec.qty_suggested)}</p>
             </div>
           </div>
         </div>
@@ -61,14 +67,14 @@ export default function ProductDetail({ productId, onBack }) {
 
       {/* Info cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <InfoCard label="Stock Actual" value={fmt(p.current_stock)} highlight={p.current_stock < 0} sub="unidades" />
-        <InfoCard label="Punto Reorden" value={fmt(p.reorder_point)} sub="unidades" />
-        <InfoCard label="Lead Time" value={`${p.lead_time_days?.toFixed(0)}d`} sub="días promedio" />
+        <InfoCard label="Stock GDL" value={fmt(p.current_stock)} highlight={p.current_stock < 0} sub="solo CEDIS principal" />
+        <InfoCard label="Stock Total" value={fmt(p.stock_consolidado)} highlight={p.stock_consolidado < 0} sub="todos los almacenes" />
+        <InfoCard label="Lead Time" value={`${p.lead_time_days?.toFixed(0)}d`} sub="último registrado" />
         <InfoCard label="Cobertura" value={p.days_coverage > 999 ? '∞' : `${p.days_coverage?.toFixed(1)}d`}
           highlight={p.days_coverage < p.lead_time_days} sub="días restantes" />
       </div>
 
-      {/* Forecast chart */}
+      {/* Forecast */}
       <div className="card">
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-semibold text-white">Pronóstico — Próximas 5 semanas</h2>
@@ -77,24 +83,35 @@ export default function ProductDetail({ productId, onBack }) {
         <ForecastChart forecast={forecast} reorderPoint={p.reorder_point} />
       </div>
 
-      {/* Extra stats */}
+      {/* Stats extra */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="card">
           <p className="text-xs text-slate-500 uppercase tracking-widest mb-3">Venta Diaria Prom.</p>
           <p className="text-2xl font-bold font-mono text-white">{fmt(p.avg_daily_sales)}</p>
-          <p className="text-xs text-slate-500 mt-1">unidades / día</p>
+          <p className="text-xs text-slate-500 mt-1">{p.unidad || 'unidades'} / día · solo GDL</p>
         </div>
         <div className="card">
           <p className="text-xs text-slate-500 uppercase tracking-widest mb-3">Safety Stock</p>
           <p className="text-2xl font-bold font-mono text-white">{fmt(p.safety_stock)}</p>
-          <p className="text-xs text-slate-500 mt-1">buffer de seguridad</p>
+          <p className="text-xs text-slate-500 mt-1">buffer de seguridad (1.5σ)</p>
         </div>
         <div className="card">
-          <p className="text-xs text-slate-500 uppercase tracking-widest mb-3">Forecast 30d</p>
-          <p className="text-2xl font-bold font-mono text-accent">{fmt(p.forecast_next_30d)}</p>
-          <p className="text-xs text-slate-500 mt-1">demanda estimada</p>
+          <p className="text-xs text-slate-500 uppercase tracking-widest mb-3">Punto de Reorden</p>
+          <p className="text-2xl font-bold font-mono text-accent">{fmt(p.reorder_point)}</p>
+          <p className="text-xs text-slate-500 mt-1">demanda × lead time + safety</p>
         </div>
       </div>
+
+      {/* Proveedor info */}
+      {p.proveedor && (
+        <div className="card">
+          <p className="text-xs text-slate-500 uppercase tracking-widest mb-3">Info Proveedor</p>
+          <div className="flex gap-8">
+            <div><p className="text-xs text-slate-500">Proveedor principal</p><p className="text-sm text-white">{p.proveedor}</p></div>
+            {p.lead_time_acordado && <div><p className="text-xs text-slate-500">Lead time acordado</p><p className="text-sm text-white">{p.lead_time_acordado} días</p></div>}
+          </div>
+        </div>
+      )}
     </main>
   )
 }

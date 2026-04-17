@@ -12,8 +12,8 @@ export default function ProductTable({ products, onSelect, page, totalPages, onP
           <thead>
             <tr className="text-xs text-slate-500 uppercase tracking-wider border-b border-slate-800">
               <th className="text-left pb-3 font-medium">Producto</th>
-              <th className="text-right pb-3 font-medium">Stock</th>
-              <th className="text-right pb-3 font-medium hidden sm:table-cell">Reorden</th>
+              <th className="text-right pb-3 font-medium">Stock GDL</th>
+              <th className="text-right pb-3 font-medium hidden sm:table-cell">Stock Total</th>
               <th className="text-right pb-3 font-medium hidden md:table-cell">Lead</th>
               <th className="text-right pb-3 font-medium">Status</th>
             </tr>
@@ -22,13 +22,24 @@ export default function ProductTable({ products, onSelect, page, totalPages, onP
             {products.map(p => (
               <tr key={p.product_id} onClick={() => onSelect(p.product_id)}
                 className="hover:bg-slate-800/40 cursor-pointer transition-colors group">
-                <td className="py-3 font-mono text-xs text-slate-300 group-hover:text-white transition-colors">{p.product_id}</td>
-                <td className={`py-3 text-right font-mono text-xs ${p.current_stock < 0 ? 'text-red-400' : 'text-slate-300'}`}>
+                <td className="py-3">
+                  <p className="font-mono text-xs text-slate-500">{p.product_id}</p>
+                  <p className="text-sm text-slate-200 group-hover:text-white transition-colors">{p.nombre || p.product_id}</p>
+                  {p.categoria && <p className="text-xs text-slate-500">{p.categoria}</p>}
+                </td>
+                <td className={`py-3 text-right font-mono text-xs ${p.current_stock < 0 ? 'text-red-400' : 'text-slate-400'}`}>
                   {p.current_stock?.toLocaleString()}
                 </td>
-                <td className="py-3 text-right font-mono text-xs text-slate-500 hidden sm:table-cell">{p.reorder_point?.toLocaleString()}</td>
+                <td className={`py-3 text-right font-mono text-xs hidden sm:table-cell ${p.stock_consolidado < 0 ? 'text-red-400' : 'text-slate-300'}`}>
+                  {p.stock_consolidado?.toLocaleString()}
+                </td>
                 <td className="py-3 text-right font-mono text-xs text-slate-500 hidden md:table-cell">{p.lead_time_days?.toFixed(0)}d</td>
-                <td className="py-3 text-right"><StatusBadge status={p.status} /></td>
+                <td className="py-3 text-right">
+                  <div className="flex flex-col items-end gap-1">
+                    <StatusBadge status={p.status} />
+                    {p.orden_abierta && <span className="text-xs text-blue-400 font-mono">llega {p.orden_fecha_llegada}</span>}
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>
