@@ -25,8 +25,8 @@ function sortProducts(products, key, dir) {
   })
 }
 
-const TH = ({ children, right, sortKey, sort, onSort }) => {
-  const active = sort.key === sortKey
+const TH = ({ children, right, sortKey, sort = { key: null, dir: 'asc' }, onSort }) => {
+  const active = sort?.key === sortKey
   const arrow = !active ? '' : sort.dir === 'asc' ? ' ↑' : ' ↓'
   const clickable = !!sortKey
   return (
