@@ -1,21 +1,105 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&display=swap');
+@import '@fontsource/ibm-plex-sans/400.css';
+@import '@fontsource/ibm-plex-sans/500.css';
+@import '@fontsource/ibm-plex-sans/600.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import '@fontsource/ibm-plex-mono/500.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-  body { @apply bg-slate-950 text-slate-100 font-sans antialiased; }
-  * { @apply border-slate-800; }
+  :root {
+    --bg:        #080C14;
+    --bg-card:   #0D1420;
+    --bg-row:    #111927;
+    --border:    rgba(255,255,255,0.06);
+    --border-hi: rgba(255,255,255,0.12);
+    --text:      #E2E8F0;
+    --muted:     #64748B;
+    --critical:  #F43F5E;
+    --urgent:    #FB923C;
+    --normal:    #34D399;
+    --order:     #60A5FA;
+    --accent:    #3B82F6;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
 }
 
-@layer utilities {
-  .glass {
-    background: rgba(15,23,42,0.7);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255,255,255,0.06);
+@layer components {
+  .card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1.25rem;
   }
-  .card { @apply glass rounded-xl p-5; }
-  .badge-critical { @apply bg-red-500/10 text-red-400 border border-red-500/20 rounded-full px-2.5 py-0.5 text-xs font-medium font-mono; }
-  .badge-urgent   { @apply bg-orange-500/10 text-orange-400 border border-orange-500/20 rounded-full px-2.5 py-0.5 text-xs font-medium font-mono; }
-  .badge-normal   { @apply bg-green-500/10 text-green-400 border border-green-500/20 rounded-full px-2.5 py-0.5 text-xs font-medium font-mono; }
+
+  .stat-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-left-width: 3px;
+    border-radius: 4px;
+    padding: 1rem 1.25rem;
+  }
+
+  .data-row {
+    display: flex;
+    align-items: center;
+    padding: 0.65rem 1rem;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+    cursor: pointer;
+  }
+  .data-row:hover { background: var(--bg-row); }
+  .data-row:last-child { border-bottom: none; }
+
+  .badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    padding: 2px 8px;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+
+  .badge-critical { background: rgba(244,63,94,0.12);  color: var(--critical); border: 1px solid rgba(244,63,94,0.25); }
+  .badge-urgent   { background: rgba(251,146,60,0.12); color: var(--urgent);   border: 1px solid rgba(251,146,60,0.25); }
+  .badge-normal   { background: rgba(52,211,153,0.10); color: var(--normal);   border: 1px solid rgba(52,211,153,0.20); }
+  .badge-order    { background: rgba(96,165,250,0.10); color: var(--order);    border: 1px solid rgba(96,165,250,0.20); }
+
+  .mono { font-family: 'IBM Plex Mono', monospace; }
+
+  input, select {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 13px;
+    padding: 0.45rem 0.75rem;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  input:focus, select:focus { border-color: var(--accent); }
+  select option { background: #0D1420; }
 }

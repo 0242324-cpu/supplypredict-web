@@ -1,24 +1,38 @@
 import { useState, useEffect } from 'react'
-import { fmtNum, fmtDays } from '../utils'
+import { AreaChart, Area, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer } from 'recharts'
 import StatusBadge from '../components/StatusBadge'
-import ForecastChart from '../components/ForecastChart'
 import Spinner from '../components/Spinner'
 import { getProduct } from '../api'
+import { fmtNum } from '../utils'
 
-// fmt → fmtNum desde utils
+const InfoCard = ({ label, value, sub, color }) => (
+  <div className="stat-card" style={{ borderLeftColor: color || '#3B82F6' }}>
+    <p className="mono uppercase tracking-widest mb-2"
+      style={{ fontSize:'10px', color:'#475569' }}>{label}</p>
+    <p className="font-semibold" style={{ fontSize:'20px', lineHeight:1, color: color || '#E2E8F0' }}>
+      {value}
+    </p>
+    {sub && <p className="mt-1.5" style={{ fontSize:'11px', color:'#475569' }}>{sub}</p>}
+  </div>
+)
 
-function InfoCard({ label, value, sub, highlight }) {
+const CustomTooltip = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null
   return (
-    <div className="card text-center">
-      <p className="text-xs text-slate-500 uppercase tracking-widest mb-1">{label}</p>
-      <p className={`text-2xl font-bold ${highlight ? 'text-red-400' : 'text-white'}`}>{value}</p>
-      {sub && <p className="text-xs text-slate-500 mt-1">{sub}</p>}
+    <div style={{ background:'#0D1420', border:'1px solid rgba(255,255,255,0.08)',
+      borderRadius:'4px', padding:'8px 12px', fontSize:'11px', fontFamily:'IBM Plex Mono' }}>
+      <p style={{ color:'#475569', marginBottom:'4px' }}>{label}</p>
+      {payload.map(p => (
+        <p key={p.name} style={{ color: p.color }}>
+          {p.name}: {fmtNum(p.value)}
+        </p>
+      ))}
     </div>
   )
 }
 
 export default function ProductDetail({ productId, onBack }) {
-  const [data, setData]     = useState(null)
+  const [data, setData]       = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -27,92 +41,154 @@ export default function ProductDetail({ productId, onBack }) {
   }, [productId])
 
   if (loading) return <Spinner />
-  if (!data?.product) return <div className="text-center py-20 text-slate-500">Producto no encontrado</div>
+  if (!data?.product) return (
+    <div className="flex items-center justify-center py-20 text-slate-600 mono" style={{ fontSize:'12px' }}>
+      Producto no encontrado
+    </div>
+  )
 
   const { product: p, forecast, recommendation: rec } = data
 
+  const chartData = forecast?.dates.map((d, i) => ({
+    date: d.slice(5),
+    yhat:       Math.round(forecast.yhat[i]),
+    yhat_lower: Math.round(forecast.yhat_lower[i]),
+    yhat_upper: Math.round(forecast.yhat_upper[i]),
+  })) || []
+
+  const isOrden = rec?.urgency === 'ORDEN_ABIERTA'
+
   return (
-    <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
-      {/* Header */}
-      <div className="flex items-center gap-4">
-        <button onClick={onBack} className="text-xs text-slate-400 hover:text-white transition-colors">← Volver</button>
-        <div className="h-4 w-px bg-slate-700" />
-        <div>
-          <p className="font-mono text-xs text-slate-500">{p.product_id}</p>
-          {p.nombre && p.nombre !== p.product_id && <p className="text-white font-medium">{p.nombre}</p>}
-        </div>
-        {p.categoria && <span className="text-xs text-slate-400 border border-slate-700 rounded-full px-2.5 py-0.5">{p.categoria}</span>}
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-3">
+        <button onClick={onBack}
+          className="mono text-slate-500 hover:text-white transition-colors"
+          style={{ fontSize:'12px' }}>← volver</button>
+        <span className="text-slate-700">/</span>
+        <span className="mono text-slate-400" style={{ fontSize:'12px' }}>{p.product_id}</span>
+        {p.categoria && (
+          <>
+            <span className="text-slate-700">/</span>
+            <span className="mono text-slate-600" style={{ fontSize:'11px' }}>{p.categoria}</span>
+          </>
+        )}
         <StatusBadge status={p.status} />
       </div>
 
-      {/* Recommendation / Orden abierta */}
+      {/* Nombre */}
+      <div>
+        <h1 className="text-white font-semibold" style={{ fontSize:'18px' }}>
+          {p.nombre || p.product_id}
+        </h1>
+        {p.proveedor && (
+          <p className="mono text-slate-500 mt-1" style={{ fontSize:'12px' }}>
+            {p.proveedor}
+            {p.lead_time_acordado ? ` · Lead acordado: ${p.lead_time_acordado}d` : ''}
+          </p>
+        )}
+      </div>
+
+      {/* Recomendación */}
       {rec && (
-        <div className={`card border ${rec.urgency === 'ORDEN_ABIERTA'
-          ? 'border-blue-500/20 bg-blue-500/5'
-          : 'border-red-500/20 bg-red-500/5'}`}>
+        <div style={{
+          background: isOrden ? 'rgba(96,165,250,0.05)' : 'rgba(244,63,94,0.05)',
+          border: `1px solid ${isOrden ? 'rgba(96,165,250,0.2)' : 'rgba(244,63,94,0.2)'}`,
+          borderRadius:'6px', padding:'1rem 1.25rem'
+        }}>
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className={`font-semibold text-sm mb-1 ${rec.urgency === 'ORDEN_ABIERTA' ? 'text-blue-400' : 'text-red-400'}`}>
-                {rec.urgency === 'ORDEN_ABIERTA' ? '📦' : '⚡'} {rec.action}
+              <p className="font-semibold mb-1" style={{
+                fontSize:'13px',
+                color: isOrden ? '#60A5FA' : '#F43F5E'
+              }}>
+                {rec.action}
               </p>
-              <p className="text-slate-400 text-xs">{rec.reason}</p>
-              {p.orden_proveedor && <p className="text-slate-500 text-xs mt-1">Proveedor: {p.orden_proveedor}</p>}
+              <p style={{ fontSize:'12px', color:'#64748B' }}>{rec.reason}</p>
             </div>
             <div className="text-right shrink-0">
-              <p className="text-xs text-slate-500 mb-0.5">{rec.urgency === 'ORDEN_ABIERTA' ? 'Cantidad ordenada' : 'Cantidad sugerida'}</p>
-              <p className={`text-xl font-bold font-mono ${rec.urgency === 'ORDEN_ABIERTA' ? 'text-blue-400' : 'text-orange-400'}`}>{fmtNum(rec.qty_suggested)}</p>
+              <p className="mono" style={{ fontSize:'10px', color:'#475569', marginBottom:'2px' }}>
+                {isOrden ? 'CANTIDAD ORDENADA' : 'CANTIDAD SUGERIDA'}
+              </p>
+              <p className="mono font-semibold" style={{
+                fontSize:'20px',
+                color: isOrden ? '#60A5FA' : '#FB923C'
+              }}>
+                {fmtNum(rec.qty_suggested)}
+              </p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Info cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <InfoCard label="Stock GDL" value={fmtNum(p.current_stock)} highlight={p.current_stock < 0} sub="solo CEDIS principal" />
-        <InfoCard label="Stock Total" value={fmtNum(p.stock_consolidado)} highlight={p.stock_consolidado < 0} sub="todos los almacenes" />
-        <InfoCard label="Lead Time" value={`${p.lead_time_days?.toFixed(0)}d`} sub="último registrado" />
+      {/* KPIs */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <InfoCard label="Stock GDL" value={fmtNum(p.current_stock)}
+          color={p.current_stock < 0 ? '#F43F5E' : '#94A3B8'} sub="CEDIS principal" />
+        <InfoCard label="Stock total" value={fmtNum(p.stock_consolidado)}
+          color={p.stock_consolidado < 0 ? '#F43F5E' : '#E2E8F0'} sub="todos los almacenes" />
+        <InfoCard label="Lead time" value={`${p.lead_time_days?.toFixed(0)}d`}
+          color="#60A5FA" sub="último registrado" />
         <InfoCard label="Cobertura" value={p.days_coverage > 999 ? '∞' : `${p.days_coverage?.toFixed(1)}d`}
-          highlight={p.days_coverage < p.lead_time_days} sub="días restantes" />
+          color={p.days_coverage < p.lead_time_days ? '#F43F5E' : '#34D399'}
+          sub="días de stock restantes" />
       </div>
 
-      {/* Forecast */}
+      {/* Forecast chart */}
       <div className="card">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="font-semibold text-white">Pronóstico — Próximas 5 semanas</h2>
-          <span className="text-xs text-slate-500 font-mono">Prophet · IC 95%</span>
+          <p className="mono uppercase tracking-widest text-slate-400" style={{ fontSize:'10px' }}>
+            Pronóstico de demanda — próximas 5 semanas
+          </p>
+          <span className="mono text-slate-600" style={{ fontSize:'10px' }}>
+            Prophet · IC 95%
+          </span>
         </div>
-        <ForecastChart forecast={forecast} reorderPoint={p.reorder_point} />
+        {chartData.length > 0 ? (
+          <ResponsiveContainer width="100%" height={180}>
+            <AreaChart data={chartData} margin={{ top:5, right:5, left:0, bottom:0 }}>
+              <defs>
+                <linearGradient id="gBlue" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#3B82F6" stopOpacity={0.15} />
+                  <stop offset="100%" stopColor="#3B82F6" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <XAxis dataKey="date"
+                tick={{ fill:'#475569', fontSize:10, fontFamily:'IBM Plex Mono' }}
+                axisLine={false} tickLine={false} />
+              <YAxis width={48}
+                tick={{ fill:'#475569', fontSize:10, fontFamily:'IBM Plex Mono' }}
+                axisLine={false} tickLine={false}
+                tickFormatter={v => v>=1000?`${(v/1000).toFixed(0)}k`:v} />
+              <Tooltip content={<CustomTooltip />} />
+              {p.reorder_point > 0 && (
+                <ReferenceLine y={p.reorder_point} stroke="#F43F5E" strokeDasharray="4 2"
+                  label={{ value:'Reorden', fill:'#F43F5E', fontSize:10, fontFamily:'IBM Plex Mono' }} />
+              )}
+              <Area type="monotone" dataKey="yhat_upper" stroke="none" fill="rgba(59,130,246,0.05)" name="Máx" />
+              <Area type="monotone" dataKey="yhat" stroke="#3B82F6" strokeWidth={2}
+                fill="url(#gBlue)" name="Forecast" dot={{ fill:'#3B82F6', r:3 }} />
+              <Area type="monotone" dataKey="yhat_lower" stroke="none" fill="rgba(59,130,246,0.05)" name="Mín" />
+            </AreaChart>
+          </ResponsiveContainer>
+        ) : (
+          <p className="mono text-slate-600 text-center py-8" style={{ fontSize:'12px' }}>
+            Sin datos de forecast
+          </p>
+        )}
       </div>
 
-      {/* Stats extra */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="card">
-          <p className="text-xs text-slate-500 uppercase tracking-widest mb-3">Venta Diaria Prom.</p>
-          <p className="text-2xl font-bold font-mono text-white">{fmtNum(p.avg_daily_sales)}</p>
-          <p className="text-xs text-slate-500 mt-1">{p.unidad || 'unidades'} / día · solo GDL</p>
-        </div>
-        <div className="card">
-          <p className="text-xs text-slate-500 uppercase tracking-widest mb-3">Safety Stock</p>
-          <p className="text-2xl font-bold font-mono text-white">{fmtNum(p.safety_stock)}</p>
-          <p className="text-xs text-slate-500 mt-1">buffer de seguridad (1.5σ)</p>
-        </div>
-        <div className="card">
-          <p className="text-xs text-slate-500 uppercase tracking-widest mb-3">Punto de Reorden</p>
-          <p className="text-2xl font-bold font-mono text-accent">{fmtNum(p.reorder_point)}</p>
-          <p className="text-xs text-slate-500 mt-1">demanda × lead time + safety</p>
-        </div>
+      {/* Métricas adicionales */}
+      <div className="grid grid-cols-3 gap-3">
+        <InfoCard label="Venta diaria prom." value={fmtNum(p.avg_daily_sales)}
+          sub={`${p.unidad||'unidades'} / día · GDL`} />
+        <InfoCard label="Safety stock" value={fmtNum(p.safety_stock)}
+          sub="buffer 1.5σ" />
+        <InfoCard label="Punto de reorden" value={fmtNum(p.reorder_point)}
+          color="#3B82F6" sub="demanda × lead + safety" />
       </div>
 
-      {/* Proveedor info */}
-      {p.proveedor && (
-        <div className="card">
-          <p className="text-xs text-slate-500 uppercase tracking-widest mb-3">Info Proveedor</p>
-          <div className="flex gap-8">
-            <div><p className="text-xs text-slate-500">Proveedor principal</p><p className="text-sm text-white">{p.proveedor}</p></div>
-            {p.lead_time_acordado && <div><p className="text-xs text-slate-500">Lead time acordado</p><p className="text-sm text-white">{p.lead_time_acordado} días</p></div>}
-          </div>
-        </div>
-      )}
     </main>
   )
 }

@@ -2,16 +2,18 @@ export default {
   content: ["./index.html", "./src/**/*.{js,jsx}"],
   theme: {
     extend: {
-      colors: {
-        brand:    { DEFAULT: '#0F172A', light: '#1E293B' },
-        critical: '#EF4444',
-        urgent:   '#F97316',
-        normal:   '#22C55E',
-        accent:   '#3B82F6',
-      },
       fontFamily: {
-        sans: ['"DM Sans"', 'sans-serif'],
-        mono: ['"DM Mono"', 'monospace'],
+        sans: ['"IBM Plex Sans"', 'sans-serif'],
+        mono: ['"IBM Plex Mono"', 'monospace'],
+      },
+      colors: {
+        critical: '#F43F5E',
+        urgent:   '#FB923C',
+        normal:   '#34D399',
+        order:    '#60A5FA',
+        accent:   '#3B82F6',
+        bg:       '#080C14',
+        card:     '#0D1420',
       },
     },
   },
