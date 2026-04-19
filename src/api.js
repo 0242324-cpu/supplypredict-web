@@ -37,3 +37,18 @@ export async function getProduct(id) {
   const { data } = await api.get(`/product/${id}`)
   return data
 }
+
+// Dispara descarga del CSV de alertas directamente en el navegador
+export function downloadAlertsCSV({ status = '', categoria = '' } = {}) {
+  if (USE_MOCK) {
+    alert('Descarga de CSV no disponible en modo demo (sin API conectada).')
+    return
+  }
+  const params = new URLSearchParams()
+  if (status)    params.set('status', status)
+  if (categoria) params.set('categoria', categoria)
+  const qs = params.toString()
+  const url = `${BASE}/export/alerts${qs ? '?' + qs : ''}`
+  // Navegación directa: el header Content-Disposition del backend dispara la descarga
+  window.location.href = url
+}

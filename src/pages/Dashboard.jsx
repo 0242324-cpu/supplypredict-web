@@ -3,7 +3,7 @@ import StatCard from '../components/StatCard'
 import AlertList from '../components/AlertList'
 import ProductTable from '../components/ProductTable'
 import Spinner from '../components/Spinner'
-import { getDashboard, getProducts } from '../api'
+import { getDashboard, getProducts, downloadAlertsCSV } from '../api'
 
 export default function Dashboard({ onSelect }) {
   const [dash, setDash]       = useState(null)
@@ -67,6 +67,35 @@ export default function Dashboard({ onSelect }) {
             className="mono text-slate-500 hover:text-white transition-colors"
             style={{ fontSize:'12px' }}>× limpiar</button>
         )}
+
+        <button
+          onClick={() => downloadAlertsCSV({ status, categoria })}
+          className="mono uppercase tracking-widest transition-all"
+          style={{
+            fontSize: '10px',
+            padding: '8px 14px',
+            border: '1px solid rgba(52, 211, 153, 0.35)',
+            borderRadius: '6px',
+            background: 'rgba(52, 211, 153, 0.08)',
+            color: '#34D399',
+            cursor: 'pointer',
+            letterSpacing: '0.08em',
+            marginLeft: 'auto'
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.background = 'rgba(52, 211, 153, 0.16)'
+            e.currentTarget.style.borderColor = 'rgba(52, 211, 153, 0.6)'
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.background = 'rgba(52, 211, 153, 0.08)'
+            e.currentTarget.style.borderColor = 'rgba(52, 211, 153, 0.35)'
+          }}
+          title={status || categoria
+            ? `Descargar alertas filtradas${status ? ' por ' + status : ''}${categoria ? ' en ' + categoria : ''}`
+            : 'Descargar críticos + urgentes'}
+        >
+          ↓ Descargar CSV
+        </button>
       </div>
 
       {/* Tabla */}
