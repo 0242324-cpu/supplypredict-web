@@ -1,54 +1,57 @@
-import axios from 'axios'
+import { DATA } from './data.js'
 
-const BASE = import.meta.env.VITE_API_URL || ''
-const USE_MOCK = !BASE
+const { dashboard, products, metrics } = DATA
 
-// ── Mock data (fallback sin API) ──────────────────────────────────────
-const MOCK_DASH = {
-  total_products: 495, critical_alerts: 470, urgent_alerts: 2,
-  orden_abierta: 15, normal_count: 8, pct_at_risk: 95.4,
-  categorias: ['Bebidas','Carnes','Empaques','Granos y Cereales','Químicos y Limpieza'],
-  mode: 'enriched',
-  top_alerts: [
-    { product_id:'SE-DGB302-12675', nombre:'Detergente 12675', categoria:'Químicos y Limpieza',
-      current_stock:-41423, stock_consolidado:-38000, lead_time_days:74, status:'CRÍTICO', qty_recommended:377114 },
-    { product_id:'CO-CAR201-10890', nombre:'Carbón 10890', categoria:'Carnes',
-      current_stock:-23, stock_consolidado:1200, lead_time_days:27, status:'ORDEN_ABIERTA',
-      orden_abierta:true, orden_id:'OC-86639', orden_fecha_llegada:'2026-04-28', orden_proveedor:'Proveedor A' },
-  ],
+// ── Helpers ────────────────────────────────────────────────────────────────
+function filterProducts({ search = '', status = '', categoria = '' }) {
+  return products.filter(p => {
+    const matchStatus = !status || p.status === status
+    const matchCat    = !categoria || p.categoria === categoria
+    const matchSearch = !search ||
+      p.product_id.toLowerCase().includes(search.toLowerCase()) ||
+      p.nombre.toLowerCase().includes(search.toLowerCase())
+    return matchStatus && matchCat && matchSearch
+  })
 }
 
-const api = axios.create({ baseURL: BASE, timeout: 8000 })
-
+// ── API surface (same signatures as before) ────────────────────────────────
 export async function getDashboard() {
-  if (USE_MOCK) return MOCK_DASH
-  const { data } = await api.get('/dashboard')
-  return data
+  return dashboard
 }
 
-export async function getProducts({ page=1, limit=15, search='', status='', categoria='' }={}) {
-  if (USE_MOCK) return { products: [], total: 0, page: 1, per_page: 15, total_pages: 1 }
-  const { data } = await api.get('/products', { params: { page, limit, search, status, categoria } })
-  return data
+export async function getProducts({ page = 1, limit = 15, search = '', status = '', categoria = '' } = {}) {
+  const filtered = filterProducts({ search, status, categoria })
+  const total = filtered.length
+  const total_pages = Math.max(1, Math.ceil(total / limit))
+  const safePage = Math.min(Math.max(1, page), total_pages)
+  const slice = filtered.slice((safePage - 1) * limit, safePage * limit)
+  return { products: slice, total, page: safePage, per_page: limit, total_pages }
 }
 
 export async function getProduct(id) {
-  if (USE_MOCK) return { product: null, forecast: null, recommendation: null }
-  const { data } = await api.get(`/product/${id}`)
-  return data
+  const p = products.find(x => x.product_id === id)
+  if (!p) return { product: null, forecast: null, recommendation: null }
+  const { forecast, recommendation, ...product } = p
+  return { product, forecast, recommendation }
 }
 
-// Dispara descarga del CSV de alertas directamente en el navegador
 export function downloadAlertsCSV({ status = '', categoria = '' } = {}) {
-  if (USE_MOCK) {
-    alert('Descarga de CSV no disponible en modo demo (sin API conectada).')
-    return
-  }
-  const params = new URLSearchParams()
-  if (status)    params.set('status', status)
-  if (categoria) params.set('categoria', categoria)
-  const qs = params.toString()
-  const url = `${BASE}/export/alerts${qs ? '?' + qs : ''}`
-  // Navegación directa: el header Content-Disposition del backend dispara la descarga
-  window.location.href = url
+  const filtered = filterProducts({ status, categoria })
+    .filter(p => p.status === 'CRÍTICO' || p.status === 'URGENTE')
+  const rows = [
+    ['product_id','categoria','stock_actual','punto_reorden','lead_time_d','cobertura_d','comprar_qty','status'],
+    ...filtered.map(p => [
+      p.product_id, p.categoria, p.current_stock, p.reorder_point,
+      p.lead_time_days, p.days_coverage.toFixed(1), p.qty_recommended, p.status
+    ])
+  ]
+  const csv = rows.map(r => r.join(',')).join('\n')
+  const blob = new Blob([csv], { type: 'text/csv' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url; a.download = 'alertas_supplypredict.csv'; a.click()
+  URL.revokeObjectURL(url)
 }
+
+// Metrics page endpoint (called via fetch in Metrics.jsx — intercept with a global)
+export { metrics as metricsData }
