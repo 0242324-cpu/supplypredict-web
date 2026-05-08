@@ -1,7 +1,7 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 import { fmtNum } from '../utils'
-import { metricsData } from '../api'
+import { getMetrics } from '../api'
 
 const GRADE_COLOR = { A:'#34D399', B:'#60A5FA', C:'#FB923C', D:'#F43F5E' }
 const GRADE_LABEL = {
@@ -13,7 +13,17 @@ const GRADE_LABEL = {
 
 export default function Metrics() {
   const [filter, setFilter] = useState('all')
-  const data = metricsData
+  const [data, setData] = useState(null)
+
+  useEffect(() => {
+    getMetrics().then(setData)
+  }, [])
+
+  if (!data) return (
+    <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+      <p className="text-slate-500" style={{ fontSize:'12px' }}>Cargando métricas...</p>
+    </main>
+  )
 
   const chartData = [
     { name:'A  <20%',   count: data.grades.A, fill: GRADE_COLOR.A },
@@ -36,7 +46,7 @@ export default function Metrics() {
     <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-5">
       <div>
         <h1 className="text-white font-semibold" style={{ fontSize:'16px' }}>
-          Precisión del modelo Prophet (MAPE)
+          Precisión del modelo LightGBM (MAPE)
         </h1>
         <p className="text-slate-500 mt-1" style={{ fontSize:'12px' }}>
           Error porcentual absoluto medio por producto. {data.total} modelos evaluados.
@@ -161,11 +171,11 @@ export default function Metrics() {
           Metodología
         </p>
         <p style={{ fontSize:'11px', color:'#64748B', lineHeight: 1.6 }}>
-          MAPE (Mean Absolute Percentage Error) mide la diferencia porcentual entre la predicción Prophet
-          y la demanda real, calculado con validación train/test split.
+          MAPE (Mean Absolute Percentage Error) mide la diferencia porcentual entre la predicción LightGBM
+          y la demanda real, calculado con validación train/test split (8 semanas).
           Productos con demanda intermitente (semanas con ventas cero alternando con picos altos)
           generan MAPE elevados inherentemente — esto es una limitación conocida de la métrica MAPE, no
-          necesariamente del modelo. Para estos casos, el intervalo de confianza al 95% que muestra el
+          necesariamente del modelo. Para estos casos, el intervalo de confianza que muestra el
           gráfico de forecast es más útil que el punto central de predicción.
         </p>
       </div>

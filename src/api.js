@@ -77,4 +77,6 @@ export function downloadAlertsCSV({ status = '', categoria = '' } = {}) {
   window.location.href = `${BASE}/export/alerts${qs ? '?' + qs : ''}`
 }
 
-export { metrics as metricsData }
+export async function getMetrics() {
+  return apiFetch('/metrics', metrics)
+}
