@@ -19,6 +19,11 @@ export default function Metrics() {
     getMetrics().then(setData)
   }, [])
 
+  const filtered = useMemo(() => {
+    if (!data) return []
+    return filter === 'all' ? data.products : data.products.filter(p => p.grade === filter)
+  }, [filter, data])
+
   if (!data) return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
       <p className="text-slate-500" style={{ fontSize:'12px' }}>Cargando métricas...</p>
@@ -31,11 +36,6 @@ export default function Metrics() {
     { name:'C  50-100%',count: data.grades.C, fill: GRADE_COLOR.C },
     { name:'D  >100%',  count: data.grades.D, fill: GRADE_COLOR.D },
   ]
-
-  const filtered = useMemo(() =>
-    filter === 'all' ? data.products : data.products.filter(p => p.grade === filter),
-    [filter, data.products]
-  )
 
   const pctUsable = data.total > 0
     ? (((data.grades.A || 0) + (data.grades.B || 0) + (data.grades.C || 0)) / data.total * 100).toFixed(0)
