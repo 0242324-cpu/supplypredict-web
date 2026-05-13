@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 
-export default function Header({ onHome, onMetrics, page, alertCount }) {
+export default function Header({ onHome, onMetrics, onUpload, page, alertCount }) {
   const [time, setTime] = useState(new Date())
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 60000)
@@ -41,6 +41,12 @@ export default function Header({ onHome, onMetrics, page, alertCount }) {
               style={{ color: page==='metrics' ? '#E2E8F0' : '#64748B',
                        background: page==='metrics' ? 'rgba(255,255,255,0.06)' : 'transparent' }}>
               Métricas del modelo
+            </button>
+            <button onClick={onUpload}
+              className="px-3 py-1 rounded text-xs transition-colors"
+              style={{ color: page==='upload' ? '#E2E8F0' : '#64748B',
+                       background: page==='upload' ? 'rgba(255,255,255,0.06)' : 'transparent' }}>
+              Carga de datos
             </button>
           </nav>
         </div>

@@ -3,6 +3,7 @@ import Header from './components/Header'
 import Dashboard from './pages/Dashboard'
 import ProductDetail from './pages/ProductDetail'
 import Metrics from './pages/Metrics'
+import DataUploadPage from './pages/DataUploadPage'
 
 export default function App() {
   const [page, setPage]         = useState('dashboard')
@@ -12,18 +13,21 @@ export default function App() {
   const goDetail  = (id) => { setSelected(id); setPage('detail') }
   const goHome    = ()    => setPage('dashboard')
   const goMetrics = ()    => setPage('metrics')
+  const goUpload  = ()    => setPage('upload')
 
   return (
     <div style={{ minHeight:'100vh' }}>
       <Header
         onHome={goHome}
         onMetrics={goMetrics}
+        onUpload={goUpload}
         page={page === 'detail' ? 'dashboard' : page}
         alertCount={alertCount}
       />
       {page === 'dashboard' && <Dashboard onSelect={goDetail} />}
       {page === 'detail'    && <ProductDetail productId={selected} onBack={goHome} />}
       {page === 'metrics'   && <Metrics />}
+      {page === 'upload'    && <DataUploadPage />}
     </div>
   )
 }
