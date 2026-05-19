@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Old Vite frontend (replaced by design handoff bundle)
+_old_frontend/

@@ -1,0 +1,239 @@
+/* SupplyPredict — design tokens.
+   Three aesthetics × two modes, controlled via [data-aesthetic] and .dark on <html>. */
+
+:root {
+  /* ── Default: "clean" light (Linear/Vercel inspired) ────────────────────── */
+  --ink:   17 24 39;        /* primary text */
+  --sub:   71 85 105;       /* secondary text */
+  --mute:  148 163 184;     /* tertiary / placeholders */
+  --line:  226 232 240;     /* hairline borders */
+  --surf:  255 255 255;     /* card */
+  --surf2: 248 250 252;     /* recessed surface (tables, code) */
+  --page:  250 250 249;     /* page background */
+  --brand: 17 24 39;        /* primary action — near-black */
+  --brand-fg: 255 255 255;
+
+  /* Semantic — tuned via oklch then converted to rgb tuples */
+  --crit:    220 38 38;     /* oklch(0.58 0.21 27) */
+  --crit-bg: 254 226 226;
+  --warn:    234 88 12;     /* oklch(0.66 0.19 50) */
+  --warn-bg: 254 233 213;
+  --ok:      22 163 74;     /* oklch(0.62 0.16 152) */
+  --ok-bg:   220 252 231;
+
+  /* Geometry */
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-xs: 6px;
+}
+
+html.dark {
+  --ink:   241 245 249;
+  --sub:   148 163 184;
+  --mute:  100 116 139;
+  --line:  30 41 59;
+  --surf:  17 24 39;
+  --surf2: 15 23 42;
+  --page:  9 14 26;
+  --brand: 241 245 249;
+  --brand-fg: 15 23 42;
+
+  --crit:    248 113 113;
+  --crit-bg: 69 10 10;
+  --warn:    251 146 60;
+  --warn-bg: 67 30 8;
+  --ok:      74 222 128;
+  --ok-bg:   6 46 26;
+}
+
+/* ── "Cálido" — Stripe/Notion: warm whites, soft surfaces ─────────────────── */
+html[data-aesthetic="warm"] {
+  --ink:   45 36 28;
+  --sub:   92 79 67;
+  --mute:  168 156 142;
+  --line:  235 226 213;
+  --surf:  254 252 247;
+  --surf2: 248 243 233;
+  --page:  246 240 228;
+  --brand: 27 80 92;        /* deep teal accent */
+  --brand-fg: 254 252 247;
+}
+html.dark[data-aesthetic="warm"] {
+  --ink:   245 234 217;
+  --sub:   192 175 152;
+  --mute:  118 105 87;
+  --line:  53 42 33;
+  --surf:  35 27 21;
+  --surf2: 27 21 16;
+  --page:  20 16 12;
+  --brand: 138 207 216;
+  --brand-fg: 20 16 12;
+}
+
+/* ── "Terminal" — monospaced typography on top of Clean's color tokens ───── */
+html[data-aesthetic="terminal"] {
+  --radius: 4px;
+  --radius-sm: 2px;
+  --radius-xs: 2px;
+}
+/* Color tokens inherit from :root (Clean light) and html.dark (Clean dark). */
+
+/* ── Base ─────────────────────────────────────────────────────────────────── */
+html, body { height: 100%; }
+body {
+  font-family: 'Manrope', ui-sans-serif, system-ui, sans-serif;
+  background: rgb(var(--page));
+  color: rgb(var(--ink));
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: "ss01", "cv11";
+}
+
+html[data-aesthetic="terminal"] body {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+}
+html[data-aesthetic="terminal"] .display-font {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.tabular { font-variant-numeric: tabular-nums; }
+.mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+/* Headline display style — heavier in clean, monospace in terminal */
+.display {
+  font-family: 'Manrope', sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+html[data-aesthetic="terminal"] .display {
+  font-family: 'JetBrains Mono', monospace;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+}
+
+/* Subtle scrollbar */
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: rgb(var(--line)); border-radius: 6px; border: 2px solid rgb(var(--page)); }
+*::-webkit-scrollbar-thumb:hover { background: rgb(var(--mute)); }
+
+/* Page transition */
+.page-enter {
+  animation: pageIn 280ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes pageIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Skeleton shimmer */
+.skel {
+  background: linear-gradient(90deg,
+    rgb(var(--line) / 0.5) 0%,
+    rgb(var(--line) / 0.9) 50%,
+    rgb(var(--line) / 0.5) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+  border-radius: 4px;
+}
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+/* Row hover lift */
+.row-hover { transition: background 120ms ease, transform 120ms ease; }
+.row-hover:hover { background: rgb(var(--surf2)); }
+
+/* Toast slide-in */
+.toast-enter {
+  animation: toastIn 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0)   scale(1); }
+}
+
+/* Pulse for critical countdown */
+.pulse-crit {
+  animation: pulseCrit 2s ease-in-out infinite;
+}
+@keyframes pulseCrit {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(var(--crit) / 0.4); }
+  50%      { box-shadow: 0 0 0 6px rgb(var(--crit) / 0); }
+}
+
+/* Stat card gradient (used in "gradient" stat treatment) */
+.grad-crit { background: linear-gradient(135deg,
+    rgb(var(--crit-bg) / 1) 0%,
+    rgb(var(--surf) / 1) 60%); }
+.grad-warn { background: linear-gradient(135deg,
+    rgb(var(--warn-bg) / 1) 0%,
+    rgb(var(--surf) / 1) 60%); }
+.grad-ok   { background: linear-gradient(135deg,
+    rgb(var(--ok-bg) / 1) 0%,
+    rgb(var(--surf) / 1) 60%); }
+.grad-brand{ background: linear-gradient(135deg,
+    rgb(var(--brand) / 0.08) 0%,
+    rgb(var(--surf) / 1) 60%); }
+
+/* Aesthetic-specific tweaks */
+html[data-aesthetic="terminal"] .card { border-radius: var(--radius); }
+html[data-aesthetic="terminal"] button, html[data-aesthetic="terminal"] .pill { border-radius: var(--radius-xs); }
+
+/* Severity row tints */
+.tint-crit { background: linear-gradient(90deg, rgb(var(--crit-bg) / 0.55), transparent 70%); }
+.tint-warn { background: linear-gradient(90deg, rgb(var(--warn-bg) / 0.55), transparent 70%); }
+
+/* Left rail for severity */
+.rail-crit { box-shadow: inset 3px 0 0 0 rgb(var(--crit)); }
+.rail-warn { box-shadow: inset 3px 0 0 0 rgb(var(--warn)); }
+.rail-ok   { box-shadow: inset 3px 0 0 0 rgb(var(--ok)); }
+
+/* Reset DC tweaks-panel header look to match dark mode */
+html.dark .twk-panel {
+  background: rgba(15, 23, 42, 0.85) !important;
+  color: rgb(241 245 249) !important;
+  border-color: rgba(255,255,255,.08) !important;
+}
+html.dark .twk-panel .twk-lbl,
+html.dark .twk-panel .twk-hd b,
+html.dark .twk-panel .twk-sect { color: rgb(226 232 240) !important; }
+html.dark .twk-panel .twk-val { color: rgba(226,232,240,.55) !important; }
+html.dark .twk-panel .twk-field { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.08); color: rgb(226 232 240); }
+
+/* Focus rings */
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {
+  outline: 2px solid rgb(var(--brand) / 0.4);
+  outline-offset: 2px;
+}
+
+/* hide spin buttons on number inputs */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* Tooltip */
+.tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: rgb(var(--ink));
+  color: rgb(var(--surf));
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.15);
+  z-index: 60;
+}
+.tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%; left: 50%;
+  margin-left: -4px;
+  border: 4px solid transparent;
+  border-top-color: rgb(var(--ink));
+}
