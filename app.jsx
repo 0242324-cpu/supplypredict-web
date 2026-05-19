@@ -14,12 +14,21 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
 function App() {
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const [route, setRoute] = useStateA({ name: 'dashboard', sku: null });
+  // Bumped by data.jsx's fetchProductNames() once /product-names arrives,
+  // so the tree re-renders with real descriptions in place of the SKU fallback.
+  const [, setDataVersion] = useStateA(0);
 
   // Apply aesthetic + dark to <html>
   useEffectA(() => {
     document.documentElement.setAttribute('data-aesthetic', tweaks.aesthetic);
     document.documentElement.classList.toggle('dark', !!tweaks.dark);
   }, [tweaks.aesthetic, tweaks.dark]);
+
+  // Install the global rerender hook for data.jsx.
+  useEffectA(() => {
+    window.APP_RERENDER = () => setDataVersion(v => v + 1);
+    return () => { if (window.APP_RERENDER) delete window.APP_RERENDER; };
+  }, []);
 
   const navigate = (name, sku = null) => {
     setRoute({ name, sku });
