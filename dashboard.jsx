@@ -54,7 +54,7 @@ const Dashboard = ({ tweaks, onOpenProduct, onNavigate }) => {
             </span>
           </div>
           <h1 className="display text-[36px] mt-1.5 leading-tight">
-            Buenos días, María.
+            Buenos días, TOYO.
             <span className="text-sub"> Hoy hay </span>
             <span className="text-crit">{stats.crit} SKUs</span>
             <span className="text-sub"> en riesgo de quiebre.</span>

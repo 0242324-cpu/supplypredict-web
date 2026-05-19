@@ -156,10 +156,6 @@ const Header = ({ current, tweaks, onNavigate, onToggleDark }) => {
                 className="h-9 w-9 grid place-items-center rounded-[var(--radius-sm)] bg-surf ring-1 ring-line text-sub hover:text-ink hover:ring-mute transition-colors">
           <Icon name={tweaks.dark ? 'sun' : 'moon'} size={14} />
         </button>
-
-        <div className="h-9 w-9 rounded-full bg-gradient-to-br from-[oklch(0.65_0.13_50)] to-[oklch(0.55_0.15_15)] grid place-items-center text-white text-[12px] font-semibold ring-2 ring-page">
-          MH
-        </div>
       </div>
     </header>
   );
