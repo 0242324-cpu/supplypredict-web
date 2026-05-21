@@ -40,22 +40,26 @@ const ForecastChart = ({
 
   if (!history?.length || !forecast?.length) return null;
 
+  // Mostrar solo las ultimas 12 semanas de historia para que HOY quede ~70% del eje
+  const DISPLAY_HIST_WEEKS = 12;
+  const displayHistory = history.slice(-DISPLAY_HIST_WEEKS);
+
   const allVals = [
-    ...history.map(d => d.actual),
+    ...displayHistory.map(d => d.actual),
     ...forecast.map(d => d.upper),
     ...forecast.map(d => d.mean),
   ].filter(Number.isFinite);
   const yMax = Math.max(...allVals) * 1.18;
   const yMin = 0;
 
-  const xMin = history[0].day;
+  const xMin = displayHistory[0].day;
   const xMax = forecast[forecast.length - 1].day;
   const xRange = xMax - xMin || 1;
 
   const x = d => pad.l + ((d - xMin) / xRange) * innerW;
   const y = v => pad.t + innerH - ((v - yMin) / (yMax - yMin || 1)) * innerH;
 
-  const histPath = history.map((d, i) =>
+  const histPath = displayHistory.map((d, i) =>
     `${i === 0 ? 'M' : 'L'}${x(d.day).toFixed(1)},${y(d.actual).toFixed(1)}`
   ).join(' ');
 
@@ -63,7 +67,7 @@ const ForecastChart = ({
     `${i === 0 ? 'M' : 'L'}${x(d.day).toFixed(1)},${y(d.mean).toFixed(1)}`
   ).join(' ');
 
-  const last  = history[history.length - 1];
+  const last  = displayHistory[displayHistory.length - 1] || history[history.length - 1];
   const first = forecast[0];
   const bridgePath = `M${x(last.day).toFixed(1)},${y(last.actual).toFixed(1)} L${x(first.day).toFixed(1)},${y(first.mean).toFixed(1)}`;
 
@@ -84,9 +88,12 @@ const ForecastChart = ({
     return ticks;
   }, [yMax]);
 
-  const xTicks = isWeekly
-    ? [...history, ...forecast].map(d => d.day)
-    : [-30, -20, -10, 0, 10, 20, 30].filter(d => d >= xMin && d <= xMax);
+  const xTicks = (() => {
+    if (!isWeekly) return [-30, -20, -10, 0, 10, 20, 30].filter(d => d >= xMin && d <= xMax);
+    // Combinar historia visible + forecast, etiquetar cada 2do punto para no aglomerar
+    const allPts = [...displayHistory, ...forecast];
+    return allPts.filter((_, i) => i % 2 === 0).map(d => d.day);
+  })();
 
   const [hover, setHover] = useStateChart(null);
   const [mousePos, setMousePos] = useStateChart({ x: 0, y: 0 });
@@ -99,7 +106,7 @@ const ForecastChart = ({
     const mx    = (e.clientX - rect.left) * scale;
     if (mx < pad.l || mx > W - pad.r) { setHover(null); return; }
     const day = Math.round(xMin + ((mx - pad.l) / innerW) * xRange);
-    const snapped = [...history, ...forecast].reduce((best, d) =>
+    const snapped = [...displayHistory, ...forecast].reduce((best, d) =>
       Math.abs(d.day - day) < Math.abs(best.day - day) ? d : best
     );
     if (snapped.actual != null) {
@@ -150,7 +157,7 @@ const ForecastChart = ({
                 fill="rgb(var(--mute))" fontSize="11" className="tabular">
             {isWeekly
               ? (() => {
-                  const pt = [...history, ...forecast].find(p => p.day === t);
+                  const pt = [...displayHistory, ...forecast].find(p => p.day === t);
                   return pt?.weekLabel || `${Math.round(t / 7)}s`;
                 })()
               : (t === 0 ? 'hoy' : t > 0 ? `+${t}d` : `${t}d`)}
@@ -158,7 +165,7 @@ const ForecastChart = ({
         ))}
 
         {/* History area fill */}
-        <path d={`${histPath} L${x(last.day).toFixed(1)},${y(0)} L${x(history[0].day).toFixed(1)},${y(0)} Z`}
+        <path d={`${histPath} L${x(last.day).toFixed(1)},${y(0)} L${x(displayHistory[0].day).toFixed(1)},${y(0)} Z`}
               fill="url(#demHistArea)" />
 
         {/* History line */}
