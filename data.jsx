@@ -170,52 +170,66 @@ async function fetchForecastData(sku) {
 }
 
 // Convierte forecast semanal del API al formato de ForecastChart (day-offsets desde HOY).
-// apiData.forecast: [{week, y, predicted_quantity}, ...] — test set completo
-//
-// Historia : semanas del test con day < 0  (reales, hasta la última disponible)
-// HOY      : day = 0  (línea vertical)
-// Pronóstico: 5 semanas futuras con avg_weekly_demand ± variación estacional
+// apiData.forecast: [{week, y, predicted_quantity, ci_low, ci_high}, ...]
+//   - Semanas pasadas  : y != null, day <= 0  => historia real
+//   - Semanas futuras  : y = null, day > 0   => pronostico LightGBM real (train.py paso 8)
 function buildWeeklyForecastForChart(apiData, p) {
-  const testWeeks = (apiData && apiData.forecast) || [];
-  if (!testWeeks.length) return null;
+  const allWeeks = (apiData && apiData.forecast) || [];
+  if (!allWeeks.length) return null;
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // ── Historia: test set semanas pasadas (day ≤ 0) ─────────────────────────
+  // Historia: semanas del test set pasadas (day <= 0, y real)
   const history = [];
-  for (const w of testWeeks) {
+  for (const w of allWeeks) {
     const weekDate = new Date(w.week + 'T12:00:00');
     const dayOffset = Math.round((weekDate - today) / 86400000);
-    if (dayOffset <= 0) {
+    if (dayOffset <= 0 && w.y !== null && w.y !== undefined) {
       history.push({
         day:       dayOffset,
-        actual:    Math.round(w.y || 0),
+        actual:    Math.round(w.y),
         weekLabel: weekDate.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit' }),
       });
     }
   }
   if (!history.length) return null;
 
-  // ── Pronóstico: 5 semanas futuras desde hoy ──────────────────────────────
-  const avgDemand = p.weeklyDemand || (p.dailyDemand || 0) * 7 || 100;
+  // Pronostico: semanas futuras del modelo LightGBM (y = null, day > 0)
   const forecast = [];
-  for (let i = 1; i <= 5; i++) {
-    const futureDate = new Date(today);
-    futureDate.setDate(today.getDate() + i * 7);
-    const woy = Math.ceil((futureDate - new Date(futureDate.getFullYear(), 0, 1)) / 604800000);
-    const seasonal = 1 + 0.08 * Math.sin(2 * Math.PI * woy / 52);
-    const mean = Math.max(0, Math.round(avgDemand * seasonal));
-    forecast.push({
-      day:       i * 7,
-      mean,
-      lower:     Math.round(mean * 0.80),
-      upper:     Math.round(mean * 1.20),
-      weekLabel: futureDate.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit' }),
-    });
+  for (const w of allWeeks) {
+    const weekDate = new Date(w.week + 'T12:00:00');
+    const dayOffset = Math.round((weekDate - today) / 86400000);
+    if (dayOffset > 0 && (w.y === null || w.y === undefined)) {
+      const mean = Math.max(0, Math.round(w.predicted_quantity || 0));
+      forecast.push({
+        day:       dayOffset,
+        mean,
+        lower:     Math.round(w.ci_low  != null ? w.ci_low  : mean * 0.80),
+        upper:     Math.round(w.ci_high != null ? w.ci_high : mean * 1.20),
+        weekLabel: weekDate.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit' }),
+      });
+    }
   }
 
-  // ── Proyección de stock ──────────────────────────────────────────────────
+  // Fallback: si el API aun no tiene semanas futuras (predictions_weekly.csv viejo)
+  if (!forecast.length) {
+    const avgDemand = p.weeklyDemand || (p.dailyDemand || 0) * 7 || 100;
+    for (let i = 1; i <= 5; i++) {
+      const futureDate = new Date(today);
+      futureDate.setDate(today.getDate() + i * 7);
+      const mean = Math.max(0, Math.round(avgDemand));
+      forecast.push({
+        day:       i * 7,
+        mean,
+        lower:     Math.round(mean * 0.80),
+        upper:     Math.round(mean * 1.20),
+        weekLabel: futureDate.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit' }),
+      });
+    }
+  }
+
+  // Proyeccion de stock
   let projStock = p.stock;
   const projection = forecast.map(f => {
     projStock = Math.max(0, projStock - f.mean);
@@ -224,6 +238,7 @@ function buildWeeklyForecastForChart(apiData, p) {
 
   return { history, forecast, projection, isWeekly: true };
 }
+
 
 // buildForecast fallback — solo si la API no responde
 function buildForecast(p) {
