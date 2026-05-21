@@ -11,12 +11,68 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "density": "regular"
 }/*EDITMODE-END*/;
 
+// ── Loading / error screen ───────────────────────────────────────────────────
+const LoadingScreen = ({ hasError, onRetry }) => (
+  <div className="mx-auto max-w-[1440px] px-8 py-16 space-y-8">
+    {hasError ? (
+      <div className="flex flex-col items-center gap-4 py-20 text-center">
+        <div className="h-12 w-12 rounded-full bg-critbg flex items-center justify-center">
+          <Icon name="alert" size={24} className="text-crit" />
+        </div>
+        <h2 className="text-[18px] font-semibold">No se pudo conectar al servidor</h2>
+        <p className="text-[13px] text-sub max-w-[360px]">
+          El API en Render puede estar en cold start (~50s). Verifica que{' '}
+          <span className="font-mono text-ink">supplypredict-api.onrender.com</span> esté activo.
+        </p>
+        <button onClick={onRetry}
+                className="mt-2 h-9 px-4 text-[13px] bg-ink text-[rgb(var(--surf))] rounded-[var(--radius)] hover:opacity-80 transition-opacity">
+          Reintentar
+        </button>
+      </div>
+    ) : (
+      <>
+        {/* Hero skeleton */}
+        <div className="space-y-2">
+          <div className="h-3 w-48 rounded bg-surf2 animate-pulse" />
+          <div className="h-8 w-[420px] rounded bg-surf2 animate-pulse" />
+        </div>
+        {/* Stat cards skeleton */}
+        <div className="grid grid-cols-4 gap-4">
+          {[1,2,3,4].map(i => (
+            <div key={i} className="card rounded-[var(--radius)] bg-surf ring-1 ring-line p-5 space-y-3">
+              <div className="h-3 w-24 rounded bg-surf2 animate-pulse" />
+              <div className="h-9 w-16 rounded bg-surf2 animate-pulse" />
+              <div className="h-3 w-32 rounded bg-surf2 animate-pulse" />
+            </div>
+          ))}
+        </div>
+        {/* Table skeleton */}
+        <div className="card rounded-[var(--radius)] bg-surf ring-1 ring-line overflow-hidden">
+          <div className="px-5 py-4 border-b border-line">
+            <div className="h-4 w-40 rounded bg-surf2 animate-pulse" />
+          </div>
+          {[1,2,3,4,5,6,7,8].map(i => (
+            <div key={i} className="flex items-center gap-4 px-5 py-3 border-b border-line last:border-0">
+              <div className="h-3 w-36 rounded bg-surf2 animate-pulse" />
+              <div className="h-3 w-20 rounded bg-surf2 animate-pulse ml-auto" />
+              <div className="h-5 w-16 rounded bg-surf2 animate-pulse" />
+              <div className="h-3 w-12 rounded bg-surf2 animate-pulse" />
+            </div>
+          ))}
+        </div>
+        <p className="text-center text-[12px] text-mute animate-pulse">
+          Conectando con SupplyPredict API…
+        </p>
+      </>
+    )}
+  </div>
+);
+
 function App() {
   const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const [route, setRoute] = useStateA({ name: 'dashboard', sku: null });
-  // Bumped by data.jsx's fetchProductNames() once /product-names arrives,
-  // so the tree re-renders with real descriptions in place of the SKU fallback.
-  const [, setDataVersion] = useStateA(0);
+  // Bumped by data.jsx's fetchLiveData() cuando llegan los datos reales.
+  const [dataVersion, setDataVersion] = useStateA(0);
 
   // Apply aesthetic + dark to <html>
   useEffectA(() => {
@@ -24,11 +80,15 @@ function App() {
     document.documentElement.classList.toggle('dark', !!tweaks.dark);
   }, [tweaks.aesthetic, tweaks.dark]);
 
-  // Install the global rerender hook for data.jsx.
+  // Install the global rerender hook for data.jsx (fetchLiveData + fetchForecastData).
   useEffectA(() => {
     window.APP_RERENDER = () => setDataVersion(v => v + 1);
     return () => { if (window.APP_RERENDER) delete window.APP_RERENDER; };
   }, []);
+
+
+  const isLoaded = ALL_PRODUCTS.length > 0;
+  const hasError = typeof window !== 'undefined' && window.LOAD_ERROR;
 
   const navigate = (name, sku = null) => {
     setRoute({ name, sku });
@@ -46,20 +106,26 @@ function App() {
                 onToggleDark={() => setTweak('dark', !tweaks.dark)} />
 
         <main>
-          {route.name === 'dashboard' && (
-            <Dashboard tweaks={tweaks}
-                       onOpenProduct={openProduct}
-                       onNavigate={navigate} />
-          )}
-          {route.name === 'product' && (
-            <ProductDetail sku={route.sku}
-                           tweaks={tweaks}
-                           onBack={() => navigate('dashboard')}
-                           onOpenProduct={openProduct} />
-          )}
-          {route.name === 'metrics' && (
-            <Metrics tweaks={tweaks}
-                     onOpenProduct={openProduct} />
+          {!isLoaded ? (
+            <LoadingScreen hasError={hasError} onRetry={() => { window.LOAD_ERROR = false; fetchLiveData(); }} />
+          ) : (
+            <>
+              {route.name === 'dashboard' && (
+                <Dashboard tweaks={tweaks}
+                           onOpenProduct={openProduct}
+                           onNavigate={navigate} />
+              )}
+              {route.name === 'product' && (
+                <ProductDetail sku={route.sku}
+                               tweaks={tweaks}
+                               onBack={() => navigate('dashboard')}
+                               onOpenProduct={openProduct} />
+              )}
+              {route.name === 'metrics' && (
+                <Metrics tweaks={tweaks}
+                         onOpenProduct={openProduct} />
+              )}
+            </>
           )}
         </main>
 
