@@ -28,7 +28,7 @@ const ProductDetail = ({ sku, tweaks, onBack, onOpenProduct }) => {
 
   const totalForecast30d = fc.forecast.reduce((s, d) => s + d.mean, 0);
   const daysOnHand = Math.round(p.stock / p.dailyDemand);
-  const stockoutDay = fc.projection.findIndex(d => d.stock <= p.safetyStock);
+  const stockoutDay = (fc.projection || []).findIndex(d => d.stock <= p.safetyStock);
 
   return (
     <div className="page-enter mx-auto max-w-[1440px] px-8 py-8 space-y-6">
@@ -168,43 +168,72 @@ const ProductDetail = ({ sku, tweaks, onBack, onOpenProduct }) => {
              tone={p.wmape > 80 ? 'crit' : p.wmape > 50 ? 'warn' : 'ok'} />
       </div>
 
-      {/* Forecast chart */}
-      <Card className="overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-line">
-          <div>
-            <div className="flex items-center gap-2">
-              <Icon name="chart" size={15} className="text-sub" />
-              <h2 className="font-semibold text-[14px]">Demanda histórica y pronóstico semanal</h2>
+      {/* Two charts: demand + stock */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+
+        {/* Chart 1: Demanda histórica + pronóstico */}
+        <Card className="overflow-hidden">
+          <div className="px-5 py-3 border-b border-line flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <div className="flex items-center gap-2">
+                <Icon name="chart" size={14} className="text-sub" />
+                <h2 className="font-semibold text-[13px]">Demanda histórica y pronóstico</h2>
+              </div>
+              <p className="text-[11px] text-sub mt-0.5">Test set ene–may 2026 + 5 semanas futuras · IC 80%</p>
             </div>
-            <p className="text-[12px] text-sub mt-1">Ventas reales (test set ene–may 2026) + 5 semanas de pronóstico LightGBM · intervalo de confianza al 80%</p>
+            <div className="flex items-center gap-3 text-[10px] text-sub flex-wrap">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-ink inline-block" /> Demanda real
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-0.5 w-5 bg-brand inline-block" style={{borderTop:'2px dashed rgb(var(--brand))'}} /> Pronóstico
+              </span>
+            </div>
           </div>
-          <div className="flex items-center gap-4 text-[11px] flex-wrap justify-end">
-            <Legend swatch="bg-ink" label="Ventas reales" />
-            <Legend swatch="bg-brand" stroke label="Pronóstico" dashed />
-            {(tweaks.chartTreatment === 'confidence' || tweaks.chartTreatment === 'dual') && (
-              <Legend swatch="bg-brand/30" label="Intervalo 80%" />
-            )}
-            {tweaks.chartTreatment === 'danger' && (
-              <Legend swatch="bg-crit/30" label="Zona de riesgo" pattern />
-            )}
-            {tweaks.chartTreatment === 'dual' && (
-              <Legend swatch="bg-crit" stroke label="Stock proyectado" />
-            )}
+          <div className="p-4">
+            <ForecastChart
+              history={fc.history}
+              forecast={fc.forecast}
+              isWeekly={!!fc.isWeekly}
+              treatment="confidence"
+              height={280}
+            />
           </div>
-        </div>
-        <div className="p-4">
-          <ForecastChart
-            history={fc.history}
-            forecast={fc.forecast}
-            projection={fc.projection}
-            isWeekly={!!fc.isWeekly}
-            reorderPoint={p.reorderPoint}
-            safetyStock={p.safetyStock}
-            currentStock={p.stock}
-            treatment={tweaks.chartTreatment}
-          />
-        </div>
-      </Card>
+        </Card>
+
+        {/* Chart 2: Stock proyectado */}
+        <Card className="overflow-hidden">
+          <div className="px-5 py-3 border-b border-line flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <div className="flex items-center gap-2">
+                <Icon name="box" size={14} className="text-sub" />
+                <h2 className="font-semibold text-[13px]">Proyección de inventario</h2>
+              </div>
+              <p className="text-[11px] text-sub mt-0.5">Stock actual → depleción semanal según pronóstico</p>
+            </div>
+            <div className="flex items-center gap-3 text-[10px] text-sub flex-wrap">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-0.5 w-5 inline-block" style={{borderTop:'2px dashed rgb(var(--warn))'}} />
+                Pto. reorden
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-0.5 w-5 inline-block" style={{borderTop:'2px dashed rgb(var(--crit))'}} />
+                Stock seguridad
+              </span>
+            </div>
+          </div>
+          <div className="p-4">
+            <StockChart
+              currentStock={p.stock}
+              forecast={fc.forecast}
+              reorderPoint={p.reorderPoint}
+              safetyStock={p.safetyStock}
+              height={280}
+            />
+          </div>
+        </Card>
+
+      </div>
 
       {/* Bottom: history & supplier + related */}
       <div className="grid grid-cols-12 gap-4">
