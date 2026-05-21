@@ -169,10 +169,10 @@ const ProductDetail = ({ sku, tweaks, onBack, onOpenProduct }) => {
       </div>
 
       {/* Two charts: demand + stock */}
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      <div className="space-y-4">
 
         {/* Chart 1: Demanda histórica + pronóstico */}
-        <Card className="overflow-hidden">
+        <Card>
           <div className="px-5 py-3 border-b border-line flex items-center justify-between gap-3 flex-wrap">
             <div>
               <div className="flex items-center gap-2">
@@ -202,7 +202,7 @@ const ProductDetail = ({ sku, tweaks, onBack, onOpenProduct }) => {
         </Card>
 
         {/* Chart 2: Stock proyectado */}
-        <Card className="overflow-hidden">
+        <Card>
           <div className="px-5 py-3 border-b border-line flex items-center justify-between gap-3 flex-wrap">
             <div>
               <div className="flex items-center gap-2">

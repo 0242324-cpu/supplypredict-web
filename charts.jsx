@@ -89,9 +89,11 @@ const ForecastChart = ({
     : [-30, -20, -10, 0, 10, 20, 30].filter(d => d >= xMin && d <= xMax);
 
   const [hover, setHover] = useStateChart(null);
+  const [mousePos, setMousePos] = useStateChart({ x: 0, y: 0 });
   const svgRef = useRefChart(null);
 
   const onMove = e => {
+    setMousePos({ x: e.clientX, y: e.clientY });
     const rect  = svgRef.current.getBoundingClientRect();
     const scale = W / rect.width;
     const mx    = (e.clientX - rect.left) * scale;
@@ -197,11 +199,14 @@ const ForecastChart = ({
         )}
       </svg>
 
-      {/* Tooltip */}
+      {/* Tooltip — fixed so it's never clipped by card borders */}
       {hover && (
-        <div className="absolute pointer-events-none bg-ink text-[rgb(var(--surf))] rounded-md shadow-lg
-                        px-3 py-2 text-[11px] tabular leading-tight"
-             style={{ left: `calc(${(x(hover.day) / W) * 100}% + 10px)`, top: 16 }}>
+        <div className="fixed pointer-events-none bg-ink text-[rgb(var(--surf))] rounded-md shadow-xl
+                        px-3 py-2 text-[11px] tabular leading-tight z-[9999]"
+             style={{
+               left: Math.min(mousePos.x + 14, (typeof window !== 'undefined' ? window.innerWidth : 9999) - 220),
+               top:  Math.max(mousePos.y - 80, 8),
+             }}>
           <div className="font-semibold opacity-60 mb-1 text-[10px] uppercase tracking-wider">
             {isWeekly ? `Sem ${hover.weekLabel}` : hover.day === 0 ? 'Hoy' : hover.day > 0 ? `+${hover.day}d` : `${Math.abs(hover.day)}d atrás`}
           </div>
@@ -298,9 +303,11 @@ const StockChart = ({
   const critWeek = points.find((p, i) => i > 0 && p.stock < reorderPoint);
 
   const [hover, setHover] = useStateChart(null);
+  const [mousePos, setMousePos] = useStateChart({ x: 0, y: 0 });
   const svgRef = useRefChart(null);
 
   const onMove = e => {
+    setMousePos({ x: e.clientX, y: e.clientY });
     const rect  = svgRef.current.getBoundingClientRect();
     const scale = W / rect.width;
     const mx    = (e.clientX - rect.left) * scale;
@@ -427,11 +434,14 @@ const StockChart = ({
         )}
       </svg>
 
-      {/* Tooltip */}
+      {/* Tooltip — fixed so it's never clipped */}
       {hover && (
-        <div className="absolute pointer-events-none bg-ink text-[rgb(var(--surf))] rounded-md shadow-lg
-                        px-3 py-2 text-[11px] tabular leading-tight"
-             style={{ left: `calc(${(x(hover.day) / W) * 100}% + 10px)`, top: 16 }}>
+        <div className="fixed pointer-events-none bg-ink text-[rgb(var(--surf))] rounded-md shadow-xl
+                        px-3 py-2 text-[11px] tabular leading-tight z-[9999]"
+             style={{
+               left: Math.min(mousePos.x + 14, (typeof window !== 'undefined' ? window.innerWidth : 9999) - 220),
+               top:  Math.max(mousePos.y - 80, 8),
+             }}>
           <div className="font-semibold opacity-60 mb-1 text-[10px] uppercase tracking-wider">
             {hover.day === 0 ? 'Hoy' : `Sem ${hover.weekLabel}`}
           </div>
