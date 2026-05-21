@@ -26,8 +26,6 @@ const CAT_BY_ID = Object.fromEntries(CATEGORIES.map(c => [c.id, c]));
 
 // Real SKUs from df_supply_clean.csv (494 products).
 const REAL_SKUS = [
-  "CO-CAR201-10890",
-  "CO-CAR201-10891",
   "CO-CAR201-6301",
   "CO-CAR202-8082",
   "CO-DGB309-2133",
@@ -124,17 +122,10 @@ const REAL_SKUS = [
   "OT-UTE899-6421",
   "RE-BEB152-0098",
   "RE-BEB159-0096",
-  "RE-FVL350-10044",
   "RE-FVL350-11764",
   "RE-FVL350-11765",
   "RE-FVL350-11766",
   "RE-FVL350-11940",
-  "RE-FVL350-13727",
-  "RE-FVL350-13729",
-  "RE-FVL350-13730",
-  "RE-FVL350-9655",
-  "RE-FVL350-9973",
-  "RE-FVL350-9974",
   "RE-FVL355-0529",
   "RE-FVL355-1270",
   "RE-FVL357-0523",
@@ -930,7 +921,8 @@ function buildProducts() {
       status = 'NORMAL';
     }
 
-    const wmape = Math.round((30 + rand() * 80 + (status === 'CRITICO' ? rand() * 20 : 0)) * 10) / 10;
+    const mape = Math.round((15 + rand() * 35 + (status === 'CRITICO' ? rand() * 10 : 0)) * 10) / 100;
+    const wmape = mape; // alias for backward compat
     const trend = rand() < 0.45 ? 1 : rand() < 0.7 ? -1 : 0;
     const spark = Array.from({ length: 14 }, (_, j) => {
       const seasonal = Math.sin((j / 14) * Math.PI * 2) * dailyDemand * 0.15;
@@ -948,11 +940,15 @@ function buildProducts() {
       stock,
       reorderPoint,
       safetyStock,
+      weeklyDemand: dailyDemand * 7,
       dailyDemand,
       leadTime,
       daysLeft,
       status,
-      wmape,
+      mape,
+      wmape,  // alias
+      mase: Math.round((0.5 + rand() * 0.8) * 100) / 100,
+      grade: mape < 0.20 ? 'A' : mape < 0.50 ? 'B' : mape < 1.00 ? 'C' : 'D',
       trend,
       spark,
       supplier: pick(['Proveedor A', 'Proveedor B', 'Proveedor C', 'Proveedor D', 'Proveedor E']),
@@ -1023,7 +1019,8 @@ function computeStats() {
   const crit  = ALL_PRODUCTS.filter(p => p.status === 'CRITICO').length;
   const warn  = ALL_PRODUCTS.filter(p => p.status === 'URGENTE').length;
   const ok    = total - crit - warn;
-  const medianMape = 58.3;
+  const mapes = ALL_PRODUCTS.map(p => p.mape * 100 || p.wmape || 0).sort((a, b) => a - b);
+  const medianMape = mapes[Math.floor(mapes.length / 2)] || 21.0;
   const inventoryValue = ALL_PRODUCTS.reduce((s, p) => s + p.stock * p.unitCost, 0);
   return { total, crit, warn, ok, medianMape, inventoryValue };
 }
@@ -1083,6 +1080,106 @@ async function fetchProductNames() {
 // mutate ALL_PRODUCTS in place so the first render shows the right names.
 if (typeof window !== 'undefined') {
   fetchProductNames();
+  fetchLiveData();
+}
+
+
+// ── Live data upgrade from API ──────────────────────────────────────────────
+async function fetchLiveData() {
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 20000);
+    let allProducts = [];
+    let page = 1;
+    while (true) {
+      const res = await fetch(`${API_BASE}/products?limit=100&page=${page}`, { signal: ctrl.signal });
+      if (!res.ok) break;
+      const data = await res.json();
+      allProducts = allProducts.concat(data.products || []);
+      if (!data.products || allProducts.length >= (data.total || allProducts.length)) break;
+      page++;
+      if (page > 5) break;
+    }
+    clearTimeout(t);
+    let hits = 0;
+    for (const apiP of allProducts) {
+      const local = ALL_PRODUCTS.find(p => p.sku === apiP.product_id);
+      if (!local) continue;
+      local.name         = apiP.nombre || local.name;
+      local.stock        = typeof apiP.current_stock === 'number' ? apiP.current_stock : local.stock;
+      local.weeklyDemand = apiP.avg_weekly_demand || local.weeklyDemand;
+      local.dailyDemand  = Math.max(1, Math.round((apiP.avg_weekly_demand || local.weeklyDemand) / 7));
+      local.reorderPoint = apiP.reorder_point_medium || local.reorderPoint;
+      local.safetyStock  = apiP.reorder_point_conservative || local.safetyStock;
+      local.status       = apiP.status || local.status;
+      local.mape         = typeof apiP.mape === 'number' ? apiP.mape / 100 : local.mape; // API returns % → ratio
+      local.wmape        = local.mape;  // keep alias
+      local.mase         = typeof apiP.mase === 'number' ? apiP.mase : local.mase;
+      local.grade        = apiP.grade || local.grade;
+      local.leadTime     = apiP.lead_time_avg_days || local.leadTime;
+      local.daysLeft     = Math.max(0, Math.round((local.stock - local.reorderPoint) / (local.dailyDemand + 0.01)));
+      local.orderQty     = Math.round(local.weeklyDemand * (local.leadTime / 7) * 1.5);
+      hits++;
+    }
+    // Rebuild ALERTS from real status
+    ALERTS.length = 0;
+    ALERTS.push(...ALL_PRODUCTS
+      .filter(p => p.status === 'CRITICO' || p.status === 'URGENTE')
+      .sort((a, b) => a.daysLeft - b.daysLeft)
+      .slice(0, 12));
+    if (typeof window !== 'undefined' && typeof window.APP_RERENDER === 'function') {
+      window.APP_RERENDER();
+    }
+    console.info(`[supplypredict] fetchLiveData upgraded ${hits}/${ALL_PRODUCTS.length} productos`);
+    return hits;
+  } catch (e) {
+    console.warn('[supplypredict] /products fetch failed', e);
+    return 0;
+  }
+}
+
+// ── Weekly forecast from API ─────────────────────────────────────────────────
+async function fetchForecastData(sku) {
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 10000);
+    const res = await fetch(`${API_BASE}/product/${encodeURIComponent(sku)}`, { signal: ctrl.signal });
+    clearTimeout(t);
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (e) {
+    console.warn(`[supplypredict] /product/${sku} fetch failed`, e);
+    return null;
+  }
+}
+
+// Convert API weekly forecast to ForecastChart format (day-based x-axis)
+// Semanas: [...{week, y, predicted_quantity}] → {history, forecast, projection, weekLabels}
+function buildWeeklyForecastForChart(apiData, p) {
+  const weeks = (apiData && apiData.forecast) || [];
+  if (weeks.length < 2) return buildForecast(p);
+
+  const n = weeks.length;
+  // First n-1 weeks → history (actual); last week → forecast
+  const history = weeks.slice(0, n - 1).map((w, i) => ({
+    day:       -(n - 1 - i) * 7,
+    actual:    Math.round(w.y || 0),
+    weekLabel: new Date(w.week + 'T12:00:00').toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit' }),
+  }));
+  const lastW = weeks[n - 1];
+  const forecast = [{
+    day:       7,
+    mean:      Math.round(lastW.predicted_quantity || 0),
+    lower:     Math.round((lastW.predicted_quantity || 0) * 0.82),
+    upper:     Math.round((lastW.predicted_quantity || 0) * 1.18),
+    weekLabel: new Date(lastW.week + 'T12:00:00').toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit' }),
+  }];
+  let projStock = p.stock;
+  const projection = forecast.map(f => {
+    projStock = Math.max(0, projStock - f.mean);
+    return { day: f.day, stock: projStock };
+  });
+  return { history, forecast, projection, isWeekly: true };
 }
 
 Object.assign(window, {
@@ -1095,4 +1192,7 @@ Object.assign(window, {
   computeStats,
   applyProductNames,
   fetchProductNames,
+  fetchLiveData,
+  fetchForecastData,
+  buildWeeklyForecastForChart,
 });

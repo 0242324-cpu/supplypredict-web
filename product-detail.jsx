@@ -1,11 +1,21 @@
 // Product Detail page — chart-led, with KPIs, recommendation, history.
 
-const { useMemo: useMemoP, useState: useStateP } = React;
+const { useMemo: useMemoP, useState: useStateP, useEffect: useEffectP } = React;
 
 const ProductDetail = ({ sku, tweaks, onBack, onOpenProduct }) => {
   const toast = useToast();
   const p = useMemoP(() => ALL_PRODUCTS.find(x => x.sku === sku) || ALL_PRODUCTS[0], [sku]);
-  const fc = useMemoP(() => buildForecast(p), [p]);
+  const [apiForecast, setApiForecast] = useStateP(null);
+  useEffectP(() => {
+    setApiForecast(null);
+    fetchForecastData(p.sku).then(data => {
+      if (data) setApiForecast(data);
+    });
+  }, [p.sku]);
+  const fc = useMemoP(() => {
+    if (apiForecast) return buildWeeklyForecastForChart(apiForecast, p);
+    return buildForecast(p);
+  }, [p, apiForecast]);
   const [explainOpen, setExplainOpen] = useStateP(false);
 
   // Find similar items (same category, similar daily demand)
@@ -106,9 +116,23 @@ const ProductDetail = ({ sku, tweaks, onBack, onOpenProduct }) => {
                 <table className="w-full">
                   <tbody className="tabular">
                     <tr className="border-b border-line">
-                      <td className="py-1.5 text-sub">Demanda promedio diaria</td>
-                      <td className="py-1.5 text-right">{p.dailyDemand} uds/día</td>
+                      <td className="py-1.5 text-sub">Demanda semanal promedio</td>
+                      <td className="py-1.5 text-right">{Math.round(p.weeklyDemand || p.dailyDemand * 7)} uds/sem</td>
                     </tr>
+                    {p.mase != null && <tr>
+                      <td className="py-1.5 text-sub">MASE del modelo</td>
+                      <td className={`py-1.5 text-right font-semibold ${p.mase < 1 ? 'text-ok' : 'text-warn'}`}>
+                        {p.mase.toFixed(2)} {p.mase < 1 ? '✓' : ''}
+                      </td>
+                    </tr>}
+                    {p.grade && <tr>
+                      <td className="py-1.5 text-sub">Grado de precisión</td>
+                      <td className={`py-1.5 text-right font-bold tabular ${
+                        p.grade === 'A' ? 'text-ok' : p.grade === 'B' ? 'text-ok' :
+                        p.grade === 'C' ? 'text-warn' : 'text-crit'}`}>
+                        {p.grade} · MAPE {((p.mape||p.wmape||0)*100).toFixed(1)}%
+                      </td>
+                    </tr>}
                     <tr className="border-b border-line">
                       <td className="py-1.5 text-sub">Lead time del proveedor</td>
                       <td className="py-1.5 text-right">{p.leadTime} días</td>
@@ -173,6 +197,7 @@ const ProductDetail = ({ sku, tweaks, onBack, onOpenProduct }) => {
             history={fc.history}
             forecast={fc.forecast}
             projection={fc.projection}
+            isWeekly={!!fc.isWeekly}
             reorderPoint={p.reorderPoint}
             safetyStock={p.safetyStock}
             currentStock={p.stock}
@@ -211,7 +236,7 @@ const ProductDetail = ({ sku, tweaks, onBack, onOpenProduct }) => {
         <Card className="col-span-5 overflow-hidden">
           <div className="px-5 py-4 border-b border-line">
             <h2 className="font-semibold text-[14px]">Productos similares</h2>
-            <p className="text-[12px] text-sub mt-0.5">Misma categoría · demanda comparable</p>
+            <p className="text-[12px] text-sub mt-0.5">Misma categoría · demanda semanal comparable</p>
           </div>
           <div className="divide-y divide-line">
             {related.map(r => (

@@ -27,7 +27,7 @@ const Dashboard = ({ tweaks, onOpenProduct, onNavigate }) => {
 
   const tableRows = filtered.slice(0, 12);
 
-  // Sparkline aggregated across all products — total daily demand
+  // Sparkline aggregated across all products — total weekly demand
   const totalSpark = useMemoD(() => {
     const arr = Array(14).fill(0);
     ALL_PRODUCTS.forEach(p => p.spark.forEach((v, i) => arr[i] += v));
@@ -95,8 +95,8 @@ const Dashboard = ({ tweaks, onOpenProduct, onNavigate }) => {
           spark={[3,4,4,5,7,6,8,9,11,10,12,13,14,stats.crit]}
         />
         <StatCard
-          label="WMAPE mediana"
-          value={`${stats.medianMape}%`}
+          label="MAPE mediana"
+          value={`${typeof stats.medianMape === "number" ? stats.medianMape.toFixed(1) : stats.medianMape}%`}
           sub="LightGBM v2.3.1 · 30d"
           trend={-1.8}
           icon="gauge"
@@ -344,8 +344,8 @@ const TableRow = ({ p, sevTreatment, isHover, onHover, onOpen, onAction }) => {
       </td>
       <td className="pr-2 py-3 align-middle text-right">
         <span className={`tabular text-[12px]
-                          ${p.wmape > 80 ? 'text-crit' : p.wmape > 50 ? 'text-warn' : 'text-ok'}`}>
-          {p.wmape.toFixed(1)}%
+                          ${(p.mape||p.wmape||0)*100 > 80 ? 'text-crit' : (p.mape||p.wmape||0)*100 > 50 ? 'text-warn' : 'text-ok'}`}>
+          {((p.mape || p.wmape || 0) * 100).toFixed(1)}%
         </span>
       </td>
       <td className="pr-5 py-3 align-middle text-right">

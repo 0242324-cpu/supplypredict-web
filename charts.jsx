@@ -15,6 +15,7 @@ const ForecastChart = ({
   reorderPoint, safetyStock, currentStock,
   treatment = 'danger',
   height = 360,
+  isWeekly = false,
 }) => {
   const W = 1000, H = height;
   const pad = { l: 56, r: 24, t: 30, b: 36 };
@@ -71,8 +72,10 @@ const ForecastChart = ({
     return 10 * base;
   }
 
-  // X axis ticks: -30, -20, -10, hoy, +10, +20, +30
-  const xTicks = [-30, -20, -10, 0, 10, 20, 30].filter(d => d >= xMin && d <= xMax);
+  // X axis ticks: daily or weekly
+  const xTicks = isWeekly
+    ? [...history, ...forecast].map(d => d.day)  // one tick per weekly point
+    : [-30, -20, -10, 0, 10, 20, 30].filter(d => d >= xMin && d <= xMax);
 
   // Hover state
   const [hover, setHover] = useStateChart(null);
@@ -167,7 +170,12 @@ const ForecastChart = ({
         {xTicks.map(t => (
           <text key={t} x={x(t)} y={H - pad.b + 18} textAnchor="middle"
                 fill="rgb(var(--mute))" fontSize="11" className="tabular">
-            {t === 0 ? 'hoy' : (t > 0 ? `+${t}d` : `${t}d`)}
+            {isWeekly
+              ? (() => {
+                  const pt = [...history, ...forecast].find(p => p.day === t);
+                  return pt?.weekLabel || (t === 0 ? 'hoy' : `${Math.round(t/7)}s`);
+                })()
+              : (t === 0 ? 'hoy' : (t > 0 ? `+${t}d` : `${t}d`))}
           </text>
         ))}
 
