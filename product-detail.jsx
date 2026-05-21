@@ -226,7 +226,9 @@ const ProductDetail = ({ sku, tweaks, onBack, onOpenProduct }) => {
             <StockChart
               currentStock={p.stock}
               history={fc.history}
-              forecast={fc.forecast}
+              forecast={fc.extForecast || fc.forecast}
+              simulatedProjection={fc.simulatedProjection || []}
+              orderEvents={fc.orderEvents || []}
               reorderPoint={p.reorderPoint}
               safetyStock={p.safetyStock}
               height={320}

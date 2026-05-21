@@ -234,15 +234,71 @@ function buildWeeklyForecastForChart(apiData, p) {
     }
   }
 
-  // Proyeccion de stock: depleta por demanda pronosticada
-  // (compras futuras no se conocen, se asumen 0)
+  // Proyeccion simple: depleta por demanda pronosticada (sin reorden)
   let projStock = p.stock;
   const projection = forecast.map(f => {
     projStock = Math.max(0, projStock - f.mean);
     return { day: f.day, stock: projStock };
   });
 
-  return { history, forecast, projection, isWeekly: true };
+  // ── Simulacion del ciclo de reorden (s,Q) ────────────────────────────────
+  // Extendemos el horizonte a 16 semanas para que se vea el diente de sierra.
+  // Las semanas 6-16 usan el promedio de los ultimos 3 pronosticos reales.
+  const SIMULATE_WEEKS = 16;
+  const avgForecastDemand = forecast.slice(-3).reduce((s, f) => s + f.mean, 0) / 3 || p.weeklyDemand || 100;
+  const extForecast = [...forecast];
+  const lastForecastDay = forecast[forecast.length - 1]?.day || 35;
+  for (let i = forecast.length; i < SIMULATE_WEEKS; i++) {
+    const day = lastForecastDay + (i - forecast.length + 1) * 7;
+    const fd = new Date();
+    fd.setDate(fd.getDate() + day);
+    extForecast.push({
+      day,
+      mean:      Math.round(avgForecastDemand),
+      lower:     Math.round(avgForecastDemand * 0.80),
+      upper:     Math.round(avgForecastDemand * 1.20),
+      weekLabel: fd.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit' }),
+      synthetic: true,
+    });
+  }
+
+  // Parametros de la politica (s,Q)
+  const reorderPoint  = p.reorderPoint  || 0;
+  const leadTimeWeeks = Math.max(1, Math.round((p.leadTime || 14) / 7));
+  // Q: cobertura de lead_time + 4 semanas de buffer, como minimo 1 semana de demanda
+  const orderQty = Math.max(
+    Math.round(avgForecastDemand),
+    Math.round(avgForecastDemand * (leadTimeWeeks + 4))
+  );
+
+  // Simulacion semana a semana
+  let simStock = p.stock;
+  let orderPending = false;      // solo una orden a la vez
+  let orderArrivalWeek = -1;
+  const orderEvents  = [];       // { day, type: 'place'|'arrive', qty }
+
+  const simulatedProjection = extForecast.map((f, i) => {
+    // Llega un pedido pendiente?
+    if (orderPending && i === orderArrivalWeek) {
+      simStock += orderQty;
+      orderEvents.push({ day: f.day, type: 'arrive', qty: orderQty });
+      orderPending = false;
+    }
+
+    // Depleta demanda
+    simStock = Math.max(0, simStock - f.mean);
+
+    // Hay que reordenar?
+    if (!orderPending && simStock <= reorderPoint) {
+      orderPending = true;
+      orderArrivalWeek = i + leadTimeWeeks;
+      orderEvents.push({ day: f.day, type: 'place', qty: orderQty });
+    }
+
+    return { day: f.day, stock: simStock, weekLabel: f.weekLabel, synthetic: f.synthetic || false };
+  });
+
+  return { history, forecast, extForecast, projection, simulatedProjection, orderEvents, orderQty, isWeekly: true };
 }
 
 

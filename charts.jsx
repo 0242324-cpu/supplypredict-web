@@ -262,6 +262,8 @@ const StockChart = ({
   currentStock,
   history = [],
   forecast = [],
+  simulatedProjection = [],   // ciclo de reorden simulado (s,Q)
+  orderEvents = [],           // [{ day, type: 'place'|'arrive', qty }]
   reorderPoint,
   safetyStock,
   height = 320,
@@ -288,13 +290,18 @@ const StockChart = ({
   // Punto HOY
   const todayPt = { day: 0, stock: currentStock, weekLabel: 'Hoy' };
 
-  // ── Proyección futura ─────────────────────────────────────────────────────
-  const futureStock = [];
-  s = currentStock;
-  for (const f of forecast) {
-    s = Math.max(0, s - (f.mean || 0));
-    futureStock.push({ day: f.day, stock: s, weekLabel: f.weekLabel });
-  }
+  // ── Proyeccion futura: usa simulacion de ciclo (s,Q) si esta disponible ─────
+  const futureStock = simulatedProjection.length > 0
+    ? simulatedProjection
+    : (() => {
+        const arr = [];
+        let sv = currentStock;
+        for (const f of forecast) {
+          sv = Math.max(0, sv - (f.mean || 0));
+          arr.push({ day: f.day, stock: sv, weekLabel: f.weekLabel });
+        }
+        return arr;
+      })();
 
   const allPts = [...histStock, todayPt, ...futureStock];
 
@@ -471,8 +478,40 @@ const StockChart = ({
           </g>
         ))}
 
-        {/* Alert when stock first crosses reorder point */}
-        {critPt && (
+        {/* Order events: place (orange arrow down) and arrive (green arrow up) */}
+        {orderEvents.map((ev, i) => {
+          const ex = x(ev.day);
+          // Find stock level at this day
+          const pt = futureStock.find(p => p.day === ev.day);
+          const ey = pt ? y(pt.stock) : y(reorderPoint || 0);
+          const isArrive = ev.type === 'arrive';
+          const color = isArrive ? 'rgb(var(--ok))' : 'rgb(var(--warn))';
+          const arrowY1 = isArrive ? ey + 22 : ey - 22;
+          const arrowY2 = isArrive ? ey + 6  : ey - 6;
+          const tipY    = isArrive ? ey + 2  : ey - 2;
+          const label   = isArrive ? 'Llega pedido' : 'Colocar orden';
+          return (
+            <g key={`order-${i}`}>
+              {/* Vertical dashed line from top/bottom edge */}
+              <line x1={ex} x2={ex} y1={pad.t} y2={H - pad.b}
+                    stroke={color} strokeOpacity="0.25" strokeWidth="1" strokeDasharray="3 3" />
+              {/* Arrow */}
+              <line x1={ex} x2={ex} y1={arrowY1} y2={arrowY2}
+                    stroke={color} strokeWidth="2" strokeOpacity="0.9" />
+              <polygon
+                points={`${ex},${tipY} ${ex-5},${isArrive ? tipY+10 : tipY-10} ${ex+5},${isArrive ? tipY+10 : tipY-10}`}
+                fill={color} fillOpacity="0.9" />
+              {/* Label */}
+              <text x={ex + 6} y={isArrive ? ey + 28 : ey - 28}
+                    fill={color} fontSize="9" fontWeight="600" opacity="0.85">
+                {label}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Alert when stock first crosses reorder point (only if no simulation) */}
+        {critPt && orderEvents.length === 0 && (
           <g>
             <circle cx={x(critPt.day)} cy={y(critPt.stock)} r="9"
                     fill="rgb(var(--warn))" fillOpacity="0.18"
