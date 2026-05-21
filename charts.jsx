@@ -237,61 +237,83 @@ const ForecastChart = ({
 };
 
 // ─── StockChart ───────────────────────────────────────────────────────────────
-// Proyección de inventario hacia adelante.
-// Muestra stock actual → depleción semanal según pronóstico.
-// Líneas horizontales: punto de reorden (naranja) + stock de seguridad (rojo).
+// Cubre el mismo rango temporal que ForecastChart:
+//   - Lado izquierdo (pasado): stock reconstruido hacia atrás desde stock actual
+//     usando la demanda real de cada semana del test set.
+//   - HOY: línea vertical en day=0
+//   - Lado derecho (futuro): depleción proyectada con pronóstico de demanda
+//
+// Permite comparar directamente con la gráfica de demanda y ver desabasto.
 //
 // props:
-//   currentStock  : número (stock hoy)
-//   forecast      : [{ day, mean, weekLabel }] — pronóstico de demanda
-//   reorderPoint  : número
-//   safetyStock   : número
-//   height        : número
+//   currentStock : número (stock hoy)
+//   history      : [{ day, actual, weekLabel }]  — de fc.history
+//   forecast     : [{ day, mean, weekLabel }]     — de fc.forecast
+//   reorderPoint : número
+//   safetyStock  : número
 const StockChart = ({
   currentStock,
-  forecast,
+  history = [],
+  forecast = [],
   reorderPoint,
   safetyStock,
-  height = 280,
+  height = 320,
 }) => {
   const W = 1000, H = height;
   const pad = { l: 72, r: 24, t: 28, b: 36 };
   const innerW = W - pad.l - pad.r;
   const innerH = H - pad.t - pad.b;
 
-  if (!forecast?.length) return null;
+  if (!history.length && !forecast.length) return null;
 
-  // Build projection: stock = currentStock - cumulative demand
-  const points = [{ day: 0, stock: currentStock, weekLabel: 'Hoy' }];
+  // ── Reconstruir stock histórico hacia atrás ──────────────────────────────
+  // Partimos del stock actual y sumamos de vuelta cada semana de demanda real.
+  const histStock = [];
   let s = currentStock;
-  for (const f of forecast) {
-    s = Math.max(0, s - f.mean);
-    points.push({ day: f.day, stock: s, weekLabel: f.weekLabel });
+  const rev = [...history].reverse();
+  for (const h of rev) {
+    histStock.unshift({ day: h.day, stock: s, weekLabel: h.weekLabel });
+    s = s + (h.actual || 0);   // hacia atrás: stock era mayor antes de la venta
   }
 
-  const allVals = [
-    ...points.map(p => p.stock),
-    reorderPoint,
-    safetyStock,
-    currentStock,
-  ].filter(Number.isFinite);
-  const yMax = Math.max(...allVals) * 1.22;
+  // Punto HOY
+  const todayPt = { day: 0, stock: currentStock, weekLabel: 'Hoy' };
+
+  // ── Proyección futura ─────────────────────────────────────────────────────
+  const futureStock = [];
+  s = currentStock;
+  for (const f of forecast) {
+    s = Math.max(0, s - (f.mean || 0));
+    futureStock.push({ day: f.day, stock: s, weekLabel: f.weekLabel });
+  }
+
+  const allPts = [...histStock, todayPt, ...futureStock];
+
+  // ── Escalas ───────────────────────────────────────────────────────────────
+  const allVals = [...allPts.map(p => p.stock), reorderPoint, safetyStock].filter(Number.isFinite);
+  const yMax = Math.max(...allVals) * 1.18;
   const yMin = 0;
 
-  const xMin = 0;
-  const xMax = forecast[forecast.length - 1].day;
+  const xMin = allPts[0]?.day ?? 0;
+  const xMax = allPts[allPts.length - 1]?.day ?? 0;
   const xRange = xMax - xMin || 1;
 
   const x = d => pad.l + ((d - xMin) / xRange) * innerW;
   const y = v => pad.t + innerH - ((v - yMin) / (yMax - yMin || 1)) * innerH;
 
-  const stockPath = points.map((p, i) =>
+  // Paths separados: histórico (sólido) y futuro (punteado)
+  const histPath = [...histStock, todayPt].map((p, i) =>
     `${i === 0 ? 'M' : 'L'}${x(p.day).toFixed(1)},${y(p.stock).toFixed(1)}`
   ).join(' ');
 
-  // Area under stock line
-  const stockArea = `${stockPath} L${x(xMax).toFixed(1)},${y(0)} L${x(0)},${y(0)} Z`;
+  const futurePath = [todayPt, ...futureStock].map((p, i) =>
+    `${i === 0 ? 'M' : 'L'}${x(p.day).toFixed(1)},${y(p.stock).toFixed(1)}`
+  ).join(' ');
 
+  const histAreaPath = `${histPath} L${x(todayPt.day).toFixed(1)},${y(0)} L${x(histStock[0]?.day ?? 0).toFixed(1)},${y(0)} Z`;
+  const futureAreaPath = `${futurePath} L${x(xMax).toFixed(1)},${y(0)} L${x(0)},${y(0)} Z`;
+
+  // Y ticks
   const yTicks = useMemoChart(() => {
     const step = niceStep(yMax / 5);
     const ticks = [];
@@ -299,8 +321,15 @@ const StockChart = ({
     return ticks;
   }, [yMax]);
 
-  // Highlight the week stock crosses below reorder point
-  const critWeek = points.find((p, i) => i > 0 && p.stock < reorderPoint);
+  // X ticks: same points as the chart
+  const xTicks = allPts.map(p => p.day);
+
+  // Primera semana futura que baja del reorder point
+  const critPt = futureStock.find(p => p.stock < reorderPoint);
+
+  // Color final del futuro
+  const lastStock = futureStock.length ? futureStock[futureStock.length - 1].stock : currentStock;
+  const futureColor = lastStock <= safetyStock ? 'rgb(var(--crit))' : lastStock <= reorderPoint ? 'rgb(var(--warn))' : 'rgb(var(--ok))';
 
   const [hover, setHover] = useStateChart(null);
   const [mousePos, setMousePos] = useStateChart({ x: 0, y: 0 });
@@ -312,32 +341,28 @@ const StockChart = ({
     const scale = W / rect.width;
     const mx    = (e.clientX - rect.left) * scale;
     if (mx < pad.l || mx > W - pad.r) { setHover(null); return; }
-    const day = Math.round(xMin + ((mx - pad.l) / innerW) * xRange);
-    const snapped = points.reduce((best, p) =>
+    const day = xMin + ((mx - pad.l) / innerW) * xRange;
+    const snapped = allPts.reduce((best, p) =>
       Math.abs(p.day - day) < Math.abs(best.day - day) ? p : best
     );
     setHover(snapped);
   };
-
-  // Determine overall status color
-  const lastStock = points[points.length - 1].stock;
-  const stockColor = lastStock <= safetyStock
-    ? 'rgb(var(--crit))'
-    : lastStock <= reorderPoint
-    ? 'rgb(var(--warn))'
-    : 'rgb(var(--ok))';
 
   return (
     <div className="relative">
       <svg ref={svgRef} viewBox={`0 0 ${W} ${H}`} className="w-full h-auto"
            onMouseMove={onMove} onMouseLeave={() => setHover(null)}>
         <defs>
-          <linearGradient id="stockArea" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"   stopColor={stockColor} stopOpacity="0.20" />
-            <stop offset="100%" stopColor={stockColor} stopOpacity="0.04" />
+          <linearGradient id="stockHistArea" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stopColor="rgb(var(--ink))" stopOpacity="0.10" />
+            <stop offset="100%" stopColor="rgb(var(--ink))" stopOpacity="0.01" />
+          </linearGradient>
+          <linearGradient id="stockFutureArea" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%"   stopColor={futureColor} stopOpacity="0.18" />
+            <stop offset="100%" stopColor={futureColor} stopOpacity="0.02" />
           </linearGradient>
           <pattern id="dangerHatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-            <line x1="0" y1="0" x2="0" y2="6" stroke="rgb(var(--crit))" strokeOpacity="0.15" strokeWidth="2" />
+            <line x1="0" y1="0" x2="0" y2="6" stroke="rgb(var(--crit))" strokeOpacity="0.14" strokeWidth="2" />
           </pattern>
         </defs>
 
@@ -353,16 +378,11 @@ const StockChart = ({
           </g>
         ))}
 
-        {/* Danger zone below reorder point */}
+        {/* Danger hatch below reorder point */}
         {reorderPoint > 0 && y(reorderPoint) < H - pad.b && (
-          <>
-            <rect x={pad.l} y={y(reorderPoint)} width={innerW}
-                  height={Math.max(0, (H - pad.b) - y(reorderPoint))}
-                  fill="url(#dangerHatch)" />
-            <rect x={pad.l} y={y(reorderPoint)} width={innerW}
-                  height={Math.max(0, (H - pad.b) - y(reorderPoint))}
-                  fill="rgb(var(--crit))" fillOpacity="0.04" />
-          </>
+          <rect x={pad.l} y={y(reorderPoint)} width={innerW}
+                height={Math.max(0, (H - pad.b) - y(reorderPoint))}
+                fill="url(#dangerHatch)" />
         )}
 
         {/* Reorder point line */}
@@ -389,52 +409,68 @@ const StockChart = ({
           </>
         )}
 
-        {/* X labels */}
-        {points.map(p => (
+        {/* HOY separator */}
+        <line x1={x(0)} x2={x(0)} y1={pad.t} y2={H - pad.b}
+              stroke="rgb(var(--ink))" strokeOpacity="0.35" strokeWidth="1" strokeDasharray="2 4" />
+        <text x={x(0)} y={pad.t - 10} textAnchor="middle"
+              fill="rgb(var(--ink))" fontSize="11" fontWeight="600">HOY</text>
+
+        {/* X labels — only show one every 2-3 to avoid crowding */}
+        {allPts.filter((_, i) => i % Math.max(1, Math.floor(allPts.length / 10)) === 0 || i === allPts.length - 1).map(p => (
           <text key={p.day} x={x(p.day)} y={H - pad.b + 18} textAnchor="middle"
                 fill="rgb(var(--mute))" fontSize="11" className="tabular">
             {p.weekLabel}
           </text>
         ))}
 
-        {/* Stock area fill */}
-        <path d={stockArea} fill="url(#stockArea)" />
+        {/* Historical area */}
+        <path d={histAreaPath} fill="url(#stockHistArea)" />
 
-        {/* Stock line */}
-        <path d={stockPath} fill="none" stroke={stockColor} strokeWidth="2.5"
+        {/* Historical stock line — solid */}
+        <path d={histPath} fill="none" stroke="rgb(var(--ink))" strokeWidth="2.5"
               strokeLinejoin="round" strokeLinecap="round" />
 
-        {/* Dots on each week */}
-        {points.map(p => (
-          <circle key={p.day} cx={x(p.day)} cy={y(p.stock)} r="4"
-                  fill="rgb(var(--surf))" stroke={stockColor} strokeWidth="2" />
-        ))}
+        {/* Future area */}
+        {futureStock.length > 0 && (
+          <path d={futureAreaPath} fill="url(#stockFutureArea)" />
+        )}
 
-        {/* Alert marker when stock first crosses reorder point */}
-        {critWeek && (
+        {/* Future stock line — dashed, colored by status */}
+        {futureStock.length > 0 && (
+          <path d={futurePath} fill="none" stroke={futureColor} strokeWidth="2.5"
+                strokeLinejoin="round" strokeLinecap="round" strokeDasharray="6 4" />
+        )}
+
+        {/* Today dot */}
+        <circle cx={x(0)} cy={y(currentStock)} r="5"
+                fill="rgb(var(--surf))" stroke="rgb(var(--ink))" strokeWidth="2.5" />
+
+        {/* Alert when stock first crosses reorder point */}
+        {critPt && (
           <g>
-            <circle cx={x(critWeek.day)} cy={y(critWeek.stock)} r="8"
-                    fill="rgb(var(--warn))" fillOpacity="0.2"
+            <circle cx={x(critPt.day)} cy={y(critPt.stock)} r="9"
+                    fill="rgb(var(--warn))" fillOpacity="0.18"
                     stroke="rgb(var(--warn))" strokeWidth="1.5" />
-            <text x={x(critWeek.day)} y={y(critWeek.stock) - 16} textAnchor="middle"
-                  fill="rgb(var(--warn))" fontSize="10" fontWeight="700">
-              ⚠ reorden
+            <text x={x(critPt.day)} y={y(critPt.stock) - 16}
+                  textAnchor="middle" fill="rgb(var(--warn))" fontSize="10" fontWeight="700">
+              ⚠
             </text>
           </g>
         )}
 
-        {/* Hover */}
+        {/* Hover crosshair */}
         {hover && (
           <>
             <line x1={x(hover.day)} x2={x(hover.day)} y1={pad.t} y2={H - pad.b}
-                  stroke="rgb(var(--ink))" strokeOpacity="0.25" strokeWidth="1" />
-            <circle cx={x(hover.day)} cy={y(hover.stock)} r="5"
-                    fill={stockColor} stroke="rgb(var(--surf))" strokeWidth="2" />
+                  stroke="rgb(var(--ink))" strokeOpacity="0.22" strokeWidth="1" />
+            <circle cx={x(hover.day)} cy={y(hover.stock)} r="4.5"
+                    fill={hover.day > 0 ? futureColor : 'rgb(var(--ink))'}
+                    stroke="rgb(var(--surf))" strokeWidth="2" />
           </>
         )}
       </svg>
 
-      {/* Tooltip — fixed so it's never clipped */}
+      {/* Tooltip — fixed */}
       {hover && (
         <div className="fixed pointer-events-none bg-ink text-[rgb(var(--surf))] rounded-md shadow-xl
                         px-3 py-2 text-[11px] tabular leading-tight z-[9999]"
@@ -443,17 +479,17 @@ const StockChart = ({
                top:  Math.max(mousePos.y - 80, 8),
              }}>
           <div className="font-semibold opacity-60 mb-1 text-[10px] uppercase tracking-wider">
-            {hover.day === 0 ? 'Hoy' : `Sem ${hover.weekLabel}`}
+            {hover.day === 0 ? 'Hoy' : hover.day < 0 ? `Sem ${hover.weekLabel}` : `Pronóstico ${hover.weekLabel}`}
           </div>
           <div className="flex items-baseline gap-3">
-            <span className="opacity-70">Stock proyectado</span>
+            <span className="opacity-70">{hover.day <= 0 ? 'Stock real aprox.' : 'Stock proyectado'}</span>
             <span className={`font-semibold ${hover.stock <= safetyStock ? 'text-[rgb(var(--crit))]' : hover.stock <= reorderPoint ? 'text-[rgb(var(--warn))]' : ''}`}>
               {fmt.num(Math.round(hover.stock))} uds
             </span>
           </div>
-          {hover.stock <= reorderPoint && (
+          {hover.day > 0 && hover.stock <= reorderPoint && (
             <div className="mt-1 text-[10px] opacity-80">
-              {hover.stock <= safetyStock ? '❌ Por debajo del stock de seguridad' : '⚠ Por debajo del punto de reorden'}
+              {hover.stock <= safetyStock ? '❌ Bajo stock de seguridad' : '⚠ Bajo punto de reorden'}
             </div>
           )}
         </div>

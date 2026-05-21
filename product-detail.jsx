@@ -196,7 +196,7 @@ const ProductDetail = ({ sku, tweaks, onBack, onOpenProduct }) => {
               forecast={fc.forecast}
               isWeekly={!!fc.isWeekly}
               treatment="confidence"
-              height={280}
+              height={320}
             />
           </div>
         </Card>
@@ -225,10 +225,11 @@ const ProductDetail = ({ sku, tweaks, onBack, onOpenProduct }) => {
           <div className="p-4">
             <StockChart
               currentStock={p.stock}
+              history={fc.history}
               forecast={fc.forecast}
               reorderPoint={p.reorderPoint}
               safetyStock={p.safetyStock}
-              height={280}
+              height={320}
             />
           </div>
         </Card>
