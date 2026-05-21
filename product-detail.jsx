@@ -174,9 +174,9 @@ const ProductDetail = ({ sku, tweaks, onBack, onOpenProduct }) => {
           <div>
             <div className="flex items-center gap-2">
               <Icon name="chart" size={15} className="text-sub" />
-              <h2 className="font-semibold text-[14px]">Demanda histórica y pronóstico</h2>
+              <h2 className="font-semibold text-[14px]">Demanda histórica y pronóstico semanal</h2>
             </div>
-            <p className="text-[12px] text-sub mt-1">30 días de ventas reales + 30 días de pronóstico LightGBM con intervalo de confianza al 80%</p>
+            <p className="text-[12px] text-sub mt-1">Ventas reales (test set ene–may 2026) + 5 semanas de pronóstico LightGBM · intervalo de confianza al 80%</p>
           </div>
           <div className="flex items-center gap-4 text-[11px] flex-wrap justify-end">
             <Legend swatch="bg-ink" label="Ventas reales" />

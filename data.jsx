@@ -169,49 +169,88 @@ async function fetchForecastData(sku) {
   }
 }
 
-// Convierte forecast semanal del API al formato de ForecastChart (day-offsets)
-// apiData.forecast: [{week, y, predicted_quantity}, ...]
+// Convierte forecast semanal del API al formato de ForecastChart (day-offsets desde HOY).
+// apiData.forecast: [{week, y, predicted_quantity}, ...] — test set completo
+//
+// Historia : semanas del test con day < 0  (reales, hasta la última disponible)
+// HOY      : day = 0  (línea vertical)
+// Pronóstico: 5 semanas futuras con avg_weekly_demand ± variación estacional
 function buildWeeklyForecastForChart(apiData, p) {
-  const weeks = (apiData && apiData.forecast) || [];
-  if (weeks.length < 2) return null;
+  const testWeeks = (apiData && apiData.forecast) || [];
+  if (!testWeeks.length) return null;
 
-  const n = weeks.length;
-  const history = weeks.slice(0, n - 1).map((w, i) => ({
-    day:       -(n - 1 - i) * 7,
-    actual:    Math.round(w.y || 0),
-    weekLabel: new Date(w.week + 'T12:00:00').toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit' }),
-  }));
-  const lastW = weeks[n - 1];
-  const forecast = [{
-    day:       7,
-    mean:      Math.round(lastW.predicted_quantity || 0),
-    lower:     Math.round((lastW.predicted_quantity || 0) * 0.82),
-    upper:     Math.round((lastW.predicted_quantity || 0) * 1.18),
-    weekLabel: new Date(lastW.week + 'T12:00:00').toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit' }),
-  }];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // ── Historia: test set semanas pasadas (day ≤ 0) ─────────────────────────
+  const history = [];
+  for (const w of testWeeks) {
+    const weekDate = new Date(w.week + 'T12:00:00');
+    const dayOffset = Math.round((weekDate - today) / 86400000);
+    if (dayOffset <= 0) {
+      history.push({
+        day:       dayOffset,
+        actual:    Math.round(w.y || 0),
+        weekLabel: weekDate.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit' }),
+      });
+    }
+  }
+  if (!history.length) return null;
+
+  // ── Pronóstico: 5 semanas futuras desde hoy ──────────────────────────────
+  const avgDemand = p.weeklyDemand || (p.dailyDemand || 0) * 7 || 100;
+  const forecast = [];
+  for (let i = 1; i <= 5; i++) {
+    const futureDate = new Date(today);
+    futureDate.setDate(today.getDate() + i * 7);
+    const woy = Math.ceil((futureDate - new Date(futureDate.getFullYear(), 0, 1)) / 604800000);
+    const seasonal = 1 + 0.08 * Math.sin(2 * Math.PI * woy / 52);
+    const mean = Math.max(0, Math.round(avgDemand * seasonal));
+    forecast.push({
+      day:       i * 7,
+      mean,
+      lower:     Math.round(mean * 0.80),
+      upper:     Math.round(mean * 1.20),
+      weekLabel: futureDate.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit' }),
+    });
+  }
+
+  // ── Proyección de stock ──────────────────────────────────────────────────
   let projStock = p.stock;
   const projection = forecast.map(f => {
     projStock = Math.max(0, projStock - f.mean);
     return { day: f.day, stock: projStock };
   });
+
   return { history, forecast, projection, isWeekly: true };
 }
 
-// buildForecast legacy — solo se usa si la API no responde
+// buildForecast fallback — solo si la API no responde
 function buildForecast(p) {
-  const base = p.weeklyDemand || p.dailyDemand * 7 || 100;
-  const history = Array.from({ length: 5 }, (_, i) => ({
-    day:    -(4 - i) * 7,
-    actual: Math.round(base * (0.85 + 0.3 * Math.sin(i))),
-    weekLabel: `sem-${i + 1}`,
-  }));
-  const forecast = [{
-    day:   7,
-    mean:  Math.round(base),
-    lower: Math.round(base * 0.8),
-    upper: Math.round(base * 1.2),
-    weekLabel: 'próx',
-  }];
+  const base = p.weeklyDemand || (p.dailyDemand || 0) * 7 || 100;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  // 8 semanas de historia sintética
+  const history = Array.from({ length: 8 }, (_, i) => {
+    const d = new Date(today); d.setDate(today.getDate() - (7 - i) * 7);
+    return {
+      day:       -(7 - i) * 7,
+      actual:    Math.max(0, Math.round(base * (0.85 + 0.3 * Math.sin(i)))),
+      weekLabel: d.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit' }),
+    };
+  });
+  // 5 semanas de pronóstico futuro
+  const forecast = Array.from({ length: 5 }, (_, i) => {
+    const d = new Date(today); d.setDate(today.getDate() + (i + 1) * 7);
+    const mean = Math.max(0, Math.round(base * (1 + 0.08 * Math.sin(i))));
+    return {
+      day:       (i + 1) * 7,
+      mean,
+      lower:     Math.round(mean * 0.80),
+      upper:     Math.round(mean * 1.20),
+      weekLabel: d.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit' }),
+    };
+  });
   let projStock = p.stock;
   const projection = forecast.map(f => {
     projStock = Math.max(0, projStock - f.mean);
