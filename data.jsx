@@ -180,27 +180,31 @@ function buildWeeklyForecastForChart(apiData, p) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // Historia: semanas del test set pasadas (day <= 0, y real)
+  // Ventana de tiempo: 26 semanas atras (6 meses) y 26 adelante
+  const SIX_MONTHS_DAYS = 26 * 7;  // ~182 dias
+
+  // Historia: semanas pasadas con y real, dentro de los ultimos 6 meses
   const history = [];
   for (const w of allWeeks) {
     const weekDate = new Date(w.week + 'T12:00:00');
     const dayOffset = Math.round((weekDate - today) / 86400000);
-    if (dayOffset <= 0 && w.y !== null && w.y !== undefined) {
+    if (dayOffset <= 0 && dayOffset >= -SIX_MONTHS_DAYS && w.y !== null && w.y !== undefined) {
       history.push({
         day:       dayOffset,
         actual:    Math.round(w.y),
+        compras:   Math.round(w.compras || 0),  // reabastecimiento real
         weekLabel: weekDate.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit' }),
       });
     }
   }
   if (!history.length) return null;
 
-  // Pronostico: semanas futuras del modelo LightGBM (y = null, day > 0)
+  // Pronostico: semanas futuras del modelo LightGBM (y = null, day > 0, dentro de 6 meses)
   const forecast = [];
   for (const w of allWeeks) {
     const weekDate = new Date(w.week + 'T12:00:00');
     const dayOffset = Math.round((weekDate - today) / 86400000);
-    if (dayOffset > 0 && (w.y === null || w.y === undefined)) {
+    if (dayOffset > 0 && dayOffset <= SIX_MONTHS_DAYS && (w.y === null || w.y === undefined)) {
       const mean = Math.max(0, Math.round(w.predicted_quantity || 0));
       forecast.push({
         day:       dayOffset,
@@ -225,11 +229,13 @@ function buildWeeklyForecastForChart(apiData, p) {
         lower:     Math.round(mean * 0.80),
         upper:     Math.round(mean * 1.20),
         weekLabel: futureDate.toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit' }),
+        compras:   0,
       });
     }
   }
 
-  // Proyeccion de stock
+  // Proyeccion de stock: depleta por demanda pronosticada
+  // (compras futuras no se conocen, se asumen 0)
   let projStock = p.stock;
   const projection = forecast.map(f => {
     projStock = Math.max(0, projStock - f.mean);

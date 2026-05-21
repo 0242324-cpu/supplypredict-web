@@ -267,13 +267,15 @@ const StockChart = ({
   if (!history.length && !forecast.length) return null;
 
   // ── Reconstruir stock histórico hacia atrás ──────────────────────────────
-  // Partimos del stock actual y sumamos de vuelta cada semana de demanda real.
+  // Partimos del stock actual y reconstruimos semana por semana hacia el pasado:
+  //   stock[t-1] = stock[t] + demanda[t] - compras[t]
+  // Esto refleja correctamente los reabastecimientos (compras sube el stock).
   const histStock = [];
   let s = currentStock;
   const rev = [...history].reverse();
   for (const h of rev) {
-    histStock.unshift({ day: h.day, stock: s, weekLabel: h.weekLabel });
-    s = s + (h.actual || 0);   // hacia atrás: stock era mayor antes de la venta
+    histStock.unshift({ day: h.day, stock: s, weekLabel: h.weekLabel, compras: h.compras || 0 });
+    s = Math.max(0, s + (h.actual || 0) - (h.compras || 0));
   }
 
   // Punto HOY
@@ -444,6 +446,23 @@ const StockChart = ({
         {/* Today dot */}
         <circle cx={x(0)} cy={y(currentStock)} r="5"
                 fill="rgb(var(--surf))" stroke="rgb(var(--ink))" strokeWidth="2.5" />
+
+        {/* Purchase/restock events — green upward arrows on historical weeks with compras > 0 */}
+        {histStock.filter(h => h.compras > 0).map((h, i) => (
+          <g key={`restock-${i}`}>
+            {/* Arrow shaft */}
+            <line x1={x(h.day)} x2={x(h.day)}
+                  y1={y(h.stock) + 3} y2={y(h.stock + h.compras) - 3}
+                  stroke="rgb(var(--ok))" strokeWidth="1.8" strokeOpacity="0.85" />
+            {/* Arrow head */}
+            <polygon
+              points={`${x(h.day)},${y(h.stock + h.compras) - 8} ${x(h.day) - 5},${y(h.stock + h.compras) + 2} ${x(h.day) + 5},${y(h.stock + h.compras) + 2}`}
+              fill="rgb(var(--ok))" fillOpacity="0.85" />
+            {/* Small dot at base */}
+            <circle cx={x(h.day)} cy={y(h.stock)} r="3.5"
+                    fill="rgb(var(--ok))" fillOpacity="0.7" />
+          </g>
+        ))}
 
         {/* Alert when stock first crosses reorder point */}
         {critPt && (
